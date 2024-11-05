@@ -1,0 +1,9 @@
+pillow
+numpy
+cryptography
+brotli
+colorlog
+xxhash
+Events
+bcrypt
+pillow-avif-plugin
