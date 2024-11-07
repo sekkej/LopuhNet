@@ -1,0 +1,55 @@
+.message-container {
+    padding: 8px 12px;
+    margin: 8px 0;
+    border-radius: 16px 16px 16px 1px;
+    max-width: fit-content;
+    margin-right: auto;
+}
+
+.message-own + .message-own {
+    border-radius: 4px 16px 16px 1px;
+
+    .message-header {
+        display: none;
+    }
+}
+
+.message-other + .message-other {
+    border-radius: 4px 16px 16px 1px;
+
+    .message-header {
+        display: none;
+    }
+}
+
+.message-own {
+    background-color: var(--primary);
+    color: var(--text);
+
+    .timestamp {
+        color: var(--text);
+    }
+}
+
+.message-other {
+    background-color: var(--primary-dark);
+    color: var(--text);
+
+    .timestamp {
+        color: var(--hints);
+    }
+}
+
+.message-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    margin-bottom: 4px;
+    gap: 16px;
+    min-width: 160px;
+}
+
+.message-content {
+    font-size: 0.9rem;
+    word-wrap: break-word;
+}

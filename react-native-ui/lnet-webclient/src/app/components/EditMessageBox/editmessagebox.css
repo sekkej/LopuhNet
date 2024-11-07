@@ -1,0 +1,63 @@
+.edit-message-box {
+    background-color: var(--back-bright);
+    padding: 8px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    position: absolute;
+    bottom: 16px;
+    left: 256px;
+    right: 16px;
+ }
+
+.edit-message-text-area {
+    flex-grow: 1;
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+textarea {
+    resize: none;
+    background-color: var(--back-bright);
+    width: 100%;
+    height: min-content;
+    border: none;
+    border-radius: 4px;
+    padding: 0 12px;
+    color: var(--text);
+    font-size: 0.9rem;
+}
+
+textarea::placeholder {
+    color: var(--hints);
+}
+
+textarea:focus {
+    outline: none;
+    box-shadow: none;
+}
+
+.edit-message-buttons {
+    display: flex;
+    gap: 8px;
+    margin-left: 8px;
+}
+
+.edit-message-button {
+    background-color: var(--primary);
+    color: var(--text);
+    border: none;
+    border-radius: 4px;
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.edit-message-button:hover {
+    background-color: var(--primary-dark);
+}
+
+.edit-message-button:active {
+    background-color: var(--primary-blocked);
+}
