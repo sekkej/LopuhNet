@@ -58,9 +58,10 @@ class Client:
 
     def __init__(self,
                  logger: logging.Logger,
-                 predecessor_lnet_events,
+                 predecessor_lnet_event_fire,
                  trusted_consts: dict,
                  cached_data: dict = None,
+                 database_name: str = 'lnet'
         ):
         self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         """Socket"""
@@ -72,7 +73,7 @@ class Client:
         """Logger"""
         self.__logger = logger
         
-        self.db = Database(logger)
+        self.db = Database(logger, database_name)
         """Database"""
 
         self.events = ClientEvents()
@@ -130,7 +131,11 @@ class Client:
         self._statuses = {}
         # self._allow_thread_blocking = _allow_thread_blocking
 
-        self._lnet_events = predecessor_lnet_events
+        self._last_time_server_pong = 0
+        self._listener_thread = None
+        self._listening = False
+
+        self._lnet_fire_event = predecessor_lnet_event_fire
 
         self._init_events()
     
@@ -204,49 +209,68 @@ class Client:
     
     def receive(self, _socket: socket.socket = None):
         sock = self.s if _socket is None else _socket
-        data_length = int.from_bytes(sock.recv(4), 'big')
-        return self._receive(data_length, sock)
+        try:
+            data_length = int.from_bytes(sock.recv(4), 'big')
+            return self._receive(data_length, sock)
+        except:
+            return None
 
-    def is_server_alive(self):
+    def is_server_alive(self, initial=False):
         self.logger.debug(f"Checking if server is alive...")
         try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.settimeout(5)
-            s.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 5*1024*1024)
-            connected = s.connect_ex(self._saddr)
+            if initial:
+                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                s.settimeout(5)
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 5*1024*1024)
+                connected = s.connect_ex(self._saddr)
 
-            if connected != 0:
-                return False
-            
-            self.send(b'?', s)
-            reply = self.receive(s)
-            s.close()
+                if connected != 0:
+                    return False
+                
+                self.send(b'?', s)
+                reply = self.receive(s)
+                s.close()
 
-            if reply == b'!':
+                return reply == b'!'
+            else:
+                timeout = time.time() + 8
+                while time.time() - self._last_time_server_pong > 8:
+                    if time.time() > timeout:
+                        self.logger.error(f'Ping response time out.')
+                        return False
+                    time.sleep(.1)
                 return True
-            return False
         except socket.error:
             return False
 
     def listen_messages(self):
         self.logger.info("Listening net-messages...")
-        while True:
+        self._listening = True
+        while self._listening:
             try:
                 data = self.receive()
                 if not data:
-                    self.logger.warning(f"Server closed connection...")
-                    break
+                    if not self._listening:
+                        break
+                    continue
+
+                    # if not self.is_server_alive(initial=False):
+                    #     self.db.cur.close()
+                    #     self.logger.warning(f"Server closed connection...")
+                    #     break
+
                 self.events.on_netmessage(data)
             except socket.timeout:
                 continue
             except ConnectionError as e:
+                self.db.cur.close()
                 self.logger.error(f"Connection error with server: {e}")
                 break
 
     def start(self):
         self.logger.info("Starting client...")
 
-        if not self.is_server_alive():
+        if not self.is_server_alive(initial=True):
             raise ConnectionError("Server is not alive. Cannot start Client.")
 
         # Connect to server and request onetime-keys exchange
@@ -260,7 +284,7 @@ class Client:
     def register(self, name: str, username: str, avatar_seed: str):
         self.logger.info("Registrating user...")
 
-        if not self.is_server_alive():
+        if not self.is_server_alive(initial=True):
             return False, RuntimeError("Server is not alive, cannot proceed registration request.")
         
         public_key_enc = base64.b64encode(self.public_key).decode()
@@ -316,7 +340,8 @@ class Client:
             return True
         
         self.logger.error(f"Considering server's response it's registration failure: {registration_result['message']}")
-        threading.Thread(target=self.listen_messages).start()
+        self._listener_thread = threading.Thread(target=self.listen_messages)
+        self._listener_thread.start()
         
         return False, registration_result['message']
     
@@ -353,7 +378,8 @@ class Client:
         
         self.logger.info("Successfully authenticated!")
         self.account = self.account[1]
-        threading.Thread(target=self.listen_messages).start()
+        self._listener_thread = threading.Thread(target=self.listen_messages)
+        self._listener_thread.start()
         self.logger.info("Ready to use!")
 
         return True
@@ -361,7 +387,8 @@ class Client:
     def send_event(self, event: Event):
         self.logger.debug(f'Sending an event (eid: {event.eid})...')
         self._transmission_results[event.eid] = None
-        self.send(b'TRANSMISSION:' + event.eid.encode() + b':' + event.recipient.userid.encode() + b':' + bytes(event))
+        bevent = bytes(event)
+        self.send(b'TRANSMISSION:' + event.eid.encode() + b':' + event.recipient.userid.encode() + b':' + bevent)
 
         self.logger.debug(f'Waiting answer from server...')
         timeout = time.time() + 5
@@ -373,6 +400,8 @@ class Client:
             time.sleep(.1)
         
         if self._transmission_results[event.eid] == True:
+            if EventFlags.DISPOSABLE.name not in EventFlags.get_flags(event.flags):
+                self.db.add_event(time.time_ns(), event.recipient.userid, bevent, event.eid)
             self.logger.debug(f'Transmission succeed.')
             self._transmission_results.pop(event.eid)
             return True
@@ -428,6 +457,12 @@ class Client:
         return False
     
     def on_netmessage(self, data: bytes):
+        self.logger.debug('Got message from server...')
+
+        if data == b'!':
+            self._last_time_server_pong = time.time()
+            return
+        
         try:
             if data.startswith(b'CHECKSTATUS:'):
                 response = data.decode().split(':')
@@ -457,20 +492,19 @@ class Client:
                     self.events.on_event(Event.from_bytes(
                         recv_data,
                         self.private_key
-                    ))
-                except:
+                    ), recv_data)
+                except Exception as e:
+                    self.logger.error(f"Got invalid event, retrying: {traceback.format_exc()}")
                     self.send(f'INVALID/RETRY:{event_id}'.encode())
         except Exception as e:
             self.logger.error(f"Failed to identify or proceed network message: {traceback.format_exc()}")
 
-    def on_event(self, event: Event):
-        eventType = (event.data['pId'], event.data['pName'])
-
+    def on_event(self, event: Event, original_data: bytes):
         if event.data['pId'] == FriendRequest.pId:
-            self._lnet_events.on_friend_request(event.sender)
+            self._lnet_fire_event('on_friend_request', event.sender)
         elif event.data['pId'] == FriendAccepted.pId:
             self.add_friend(event.sender)
-            self._lnet_events.on_friend_accepted(event.sender)
+            self._lnet_fire_event('on_friend_accepted', event.sender)
         
         if event.sender.userid not in self.friends:
             self.logger.warning("Peer tried to raise an event without being in friend list.")
@@ -478,7 +512,7 @@ class Client:
 
         match event.data['pId']:
             case Typing.pId:
-                self._lnet_events.on_typing(event.sender)
+                self._lnet_fire_event('on_typing', event.sender)
             case MsgCreated.pId:
                 msg = Message(**event.data['message'])
                 msg.author = User(**msg.author)
@@ -496,8 +530,9 @@ class Client:
                 msg.pictures.clear()
                 for pic in pics:
                     msg.pictures.append(Picture(**pic))
-
-                self._lnet_events.on_message(msg)
+                
+                self.db.add_event(time.time_ns(), event.recipient.userid, original_data, event.eid)
+                self._lnet_fire_event('on_message', msg)
             case GroupCreated.pId:
                 group = Group(**event.data['group'])
                 if len(group.name) < 0 or len(group.name) > 64:
@@ -518,7 +553,7 @@ class Client:
                     return
 
                 self.add_group(group)
-                self._lnet_events.on_group_created(group)
+                self._lnet_fire_event('on_group_created', group)
 
     def _init_events(self):
         self.events.on_netmessage += self.on_netmessage

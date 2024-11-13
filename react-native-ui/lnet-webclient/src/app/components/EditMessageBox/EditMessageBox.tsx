@@ -2,10 +2,12 @@
 
 import '../../globals.css'
 import './editmessagebox.css'
-import React, { useEffect, useRef } from 'react';
+import { sendAction } from '../../wsbridge';
+import React, { useEffect, useRef, useState } from 'react';
 
 export const EditMessageBox = () => {
-  const textareaRef = useRef(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [messageText, setMessageText] = useState('');
 
   useEffect(() => {
     const textarea = textareaRef.current;
@@ -14,10 +16,9 @@ export const EditMessageBox = () => {
       const handleInput = () => {
         textarea.style.height = 'auto';
         if (textarea.scrollHeight < 128) {
-            textarea.style.height = `${textarea.scrollHeight}px`;
-        }
-        else {
-            textarea.style.height = `128px`;
+          textarea.style.height = `${textarea.scrollHeight}px`;
+        } else {
+          textarea.style.height = `128px`;
         }
       };
 
@@ -29,13 +30,32 @@ export const EditMessageBox = () => {
     }
   }, []);
 
+  const handleKeyDown = async (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === 'Enter') {
+      event.preventDefault(); // Prevent new line on Enter key press
+
+      if (messageText.trim()) {
+        // Send the message
+        const userId = (await sendAction('fetch_user', { username: 'jameswarren' }))[1].userid;
+        await sendAction('send_message', { channel: userId, content: messageText });
+
+        // Clear the input field
+        setMessageText('');
+      }
+    }
+  };
+
   return (
     <div className="edit-message-box">
       <div className="edit-message-text-area">
-        <textarea placeholder="Enter your message here..." ref={textareaRef} rows="1"></textarea>
-      </div>
-      <div className="edit-message-buttons">
-        {/* Your buttons go here */}
+        <textarea
+          placeholder="Enter your message here..."
+          ref={textareaRef}
+          rows="1"
+          value={messageText}
+          onChange={(e) => setMessageText(e.target.value)}
+          onKeyDown={handleKeyDown}
+        />
       </div>
     </div>
   );

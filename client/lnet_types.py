@@ -33,6 +33,11 @@ class Message(JSI):
             namespace=UUID(bytes=str(time.time_ns())[:16].encode()),
             name=xxhash.xxh128(f"{author}{channel}{content}{timestamp}").hexdigest()
         ).hex if msgid is None else UUID(msgid).hex
+    
+    @property
+    def __dict__(self):
+        base_dict = super().__dict__
+        return {k: (v.__dict__ if hasattr(v, '__dict__') else v) for k, v in base_dict.items()}
 
 class Group(JSI):
     def __init__(self,
@@ -48,3 +53,8 @@ class Group(JSI):
             namespace=UUID(bytes=str(time.time_ns())[:16].encode()),
             name=xxhash.xxh128(f"{name}{created_at}").hexdigest()
         ).hex if groupid is None else UUID(groupid).hex
+    
+    @property
+    def __dict__(self):
+        base_dict = super().__dict__
+        return {k: (v.__dict__ if hasattr(v, '__dict__') else v) for k, v in base_dict.items()}

@@ -37,7 +37,7 @@ class Database:
         if tables.fetchone() is None:
             self.logger.info("Database hasn't been created yet before, so creating one...")
 
-            self.cur.execute("CREATE TABLE events(time, jPacket, eid)")
+            self.cur.execute("CREATE TABLE events(time, recipient_id, jPacket, eid)")
             self.cur.execute("CREATE INDEX idx_events_time ON events(time)")
 
             self.cur.execute("CREATE TABLE users(time, name, username, avatarSeed, publicKey, publicSignKey, uid)")
@@ -48,15 +48,6 @@ class Database:
         self.logger.info("Database initialized!")
 
     def update_user(self, new_user_data: User):
-        # userinfo = self.cur.execute(f"SELECT * FROM users WHERE username='{username}';").fetchone()
-        # ip = latest_ip.encode()
-        # hashedip = base64.b64decode(userinfo[4])
-        # chip = bcrypt.checkpw(ip, hashedip)
-        # if not chip:
-        #     self.logger.warning(f"User `{username}` changed their IP: {latest_ip} to {current_ip}")
-        #     new_ip = base64.b64encode(bcrypt.hashpw(current_ip.encode(), bcrypt.gensalt(10))).decode()
-        #     self.cur.execute(f"UPDATE users SET attachedIp='{new_ip}' WHERE username='{username}';")
-        #     self.con.commit()
         found_uid = self.cur.execute(f"SELECT * FROM users WHERE uid='{new_user_data.userid}';").fetchone()
         if found_uid is None:
             self.logger.error("User is not found.")
@@ -110,40 +101,8 @@ class Database:
         self.logger.info("Registration gone successfully!")
         return True
     
-    # Deprecated. Replaced with PacketDNA system.
-    # def auth(self, username: str, password: str, attached_ip: str):
-    #     self.logger.info(f"Authentificating user: `{username}`")
-
-    #     users = self.cur.execute("SELECT * FROM users").fetchall()
-
-    #     if username not in [u[2] for u in users]:
-    #         self.logger.warning("User is not found in the Database.")
-    #         return False, DatabaseException(f'Username "{username}" not found among registered users.')
-        
-    #     userinfo = [u for u in users if u[2] == username][0]
-    #     password = password.encode()
-    #     hashedpwd = base64.b64decode(userinfo[4])
-    #     chpw = bcrypt.checkpw(password, hashedpwd)
-    #     if not chpw:
-    #         self.logger.warning("Given password is invalid for authentificating user.")
-    #         return False, DatabaseException(f'Password "{password.decode()}" is invalid.')
-        
-    #     self.update_ip(username, attached_ip, userinfo[5])
-    #     self.logger.info("Authentification gone successfully!")
-    #     return True, userinfo
-    
-    def add_event(self, t: int, secure_packet: bytes, eid: str = None):
-        # if len(recv_keys) == 0:
-        #     return False, DatabaseException('List of keys for recipients cannot have length of 0.')
-        
-        # Deprecated
-        # # If UTC times are different by 5 minutes
-        # if abs(time.time_ns() - t) >= 300000000000:
-        #     return False, DatabaseException('Can\'t add event that was sent more than 5 minutes ago, it\'s too outdated and might be a security-breaking.')
-
+    def add_event(self, t: int, recipient_id: str, secure_packet: bytes, eid: str = None):
         b64packet = base64.b64encode(secure_packet).decode()
-        # b64recv_keys = [base64.b64encode(k).decode() for k in recv_keys]
-        # json_recvkeys = json.dumps(b64recv_keys)
 
         if eid is None:
             eid = xxhash.xxh128(f'{time.time_ns()}').hexdigest()
@@ -152,7 +111,7 @@ class Database:
             if packet_exists is not None:
                 raise DatabaseException(f'Event with id {eid} have already been registered in Database.')
 
-        self.cur.execute(f"INSERT INTO events VALUES ({t}, '{b64packet}', '{eid}')")
+        self.cur.execute(f"INSERT INTO events VALUES ({t}, '{recipient_id}', '{b64packet}', '{eid}')")
         self.con.commit()
 
         self.logger.debug('Added new event.')
@@ -178,8 +137,31 @@ class Database:
         self.logger.debug(f'Added {added_events}/{len(event_list)} events.')
         return True
     
+    def get_50_events(self, recipients_ids: str, first_known_index: int = 0):
+        """
+        Fetches the previous 50 events from the database before the given index.
+
+        Args:
+            first_known_index (int): the starting index from where to fetch the previous events.
+
+        Returns:
+            list: A list containing the fetched events as tuples (time, jPacket, eid).
+        """
+
+        max_index = self.cur.execute('SELECT max(rowid) FROM events').fetchone()[0]
+        if max_index is None:
+            return []
+
+        conditions_ids = ' OR '.join([f"recipient_id = '{rid}'" for rid in recipients_ids])
+        self.cur.execute(f"SELECT time, jPacket, eid FROM events WHERE rowid < {max_index-first_known_index+1} AND ({conditions_ids}) ORDER BY rowid DESC LIMIT 50")
+        events = self.cur.fetchall()
+        events.reverse()
+        decoded_events = [(time, base64.b64decode(jPacket), eid) for time, jPacket, eid in events]
+
+        return decoded_events
+    
     def remove_event(self, index: int):
-        self.cur.execute(f"DELETE FROM table_name WHERE rowid = {index+1};")
+        self.cur.execute(f"DELETE FROM events WHERE rowid = {index+1};")
         self.con.commit()
 
         self.logger.debug(f'Removed event at index: {index}.')
@@ -235,8 +217,9 @@ class Database:
 # logger.setLevel(logging.DEBUG)
 # logger.addHandler(handler)
 
-# # DB Creation
-# db = Database(logger, 'dev')
+# # # DB Creation
+# db = Database(logger, 'client/lnet_sekkej')
+# print(len(db.get_50_events(['30257deb22225c80b1163ad2059f62ee', '3e845c5b2af45dd49ea505c1ec3692fa'], 0)))
 
 # # Registration
 # p = '$lemonhead3310S*'.encode()

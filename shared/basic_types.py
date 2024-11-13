@@ -121,7 +121,7 @@ class Packet:
         contactinfo = clientsdiv.split('\u001F')
         data = json.loads(datadiv)
         sender = User.from_string(contactinfo[0])
-        recipient = [User.from_string(u) for u in contactinfo[1:]]
+        recipient = User.from_string(contactinfo[1])
 
         # Python.
         clazz = cls(**{'sender': sender, 'recipient': recipient, 'data': data}, **additional_kwargs)

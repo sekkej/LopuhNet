@@ -41,7 +41,6 @@ import socket
 from shared.dbmanager import Database, DatabaseException
 from shared.basic_types import User, ServerAccount
 from shared.packets import *
-from shared.shared_utils import SocketUtils #, ECDH, AESCipher,
 from events import Events
 import threading
 import traceback

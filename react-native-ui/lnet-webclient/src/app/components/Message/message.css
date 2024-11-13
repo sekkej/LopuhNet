@@ -2,24 +2,9 @@
     padding: 8px 12px;
     margin: 8px 0;
     border-radius: 16px 16px 16px 1px;
-    max-width: fit-content;
+    width: fit-content;
+    max-width: 90%;
     margin-right: auto;
-}
-
-.message-own + .message-own {
-    border-radius: 4px 16px 16px 1px;
-
-    .message-header {
-        display: none;
-    }
-}
-
-.message-other + .message-other {
-    border-radius: 4px 16px 16px 1px;
-
-    .message-header {
-        display: none;
-    }
 }
 
 .message-own {
@@ -51,5 +36,17 @@
 
 .message-content {
     font-size: 0.9rem;
+    white-space: pre-wrap; /* This will preserve whitespace and allow line wrapping */
     word-wrap: break-word;
+}
+
+.hide-sender {
+    padding-right: 16px;
+    border-radius: 4px 16px 16px 1px;
+    .message-header {
+        display: none;
+        * {
+            display: none;
+        }
+    }
 }

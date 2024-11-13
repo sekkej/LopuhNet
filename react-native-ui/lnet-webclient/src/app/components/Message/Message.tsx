@@ -9,9 +9,10 @@ interface MessageProps {
   sender: string;
   timestamp?: Date;
   isOwn?: boolean;
+  prevSender: string | null;
 }
   
-export const Message = ({ content, sender, timestamp, isOwn = false }: MessageProps) => {
+export const Message = ({ content, sender, timestamp, isOwn = false, prevSender }: MessageProps) => {
     const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number } | null>(null);
     const contextMenuRef = useRef<HTMLDivElement>(null);
   
@@ -48,7 +49,9 @@ export const Message = ({ content, sender, timestamp, isOwn = false }: MessagePr
   
     return (
       <div
-        className={`message-container ${isOwn ? 'message-own' : 'message-other'}`}
+        className={`message-container ${isOwn ? 'message-own' : 'message-other'} ${
+          prevSender === sender ? 'hide-sender' : ''
+        }`}
         onContextMenu={handleContextMenu}
       >
         <div className="message-header">
