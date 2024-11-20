@@ -3,6 +3,7 @@ import base64
 import time
 import datetime
 import logging
+import asyncio
 from lnetapi import LNet
 from lnet_types import Message, User, Picture, Group
 from prompt_toolkit import PromptSession
@@ -34,7 +35,8 @@ async def on_start():
 
     with patch_stdout():
         while True:
-            inp = psess.prompt('>> ', in_thread=True)
+            # await asyncio.sleep(0)
+            inp = await asyncio.to_thread(psess.prompt, '>> ')
             inp : str
             if len(inp) == 0:
                 continue

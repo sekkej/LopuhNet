@@ -2,6 +2,7 @@ import os
 import time
 import datetime
 import logging
+import asyncio
 from lnetapi import LNet
 from lnet_types import Message, User, Picture, Group
 from prompt_toolkit import PromptSession
@@ -27,6 +28,7 @@ async def on_start():
 
     with patch_stdout():
         while True:
+            await asyncio.sleep(0)
             try:
                 inp = psess.prompt('>> ', in_thread=True)
                 inp : str

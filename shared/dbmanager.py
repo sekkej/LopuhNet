@@ -26,10 +26,10 @@ class DatabaseException(BaseException):
         super().__init__(message, *args)
 
 class Database:
-    def __init__(self, logger: logging.Logger, name='lnet'):
+    def __init__(self, logger: logging.Logger, path='lnet.db'):
         self.logger = logger
 
-        self.con = sql.connect(f'{name}.db', check_same_thread=False)
+        self.con = sql.connect(path, check_same_thread=False)
         self.cur = self.con.cursor()
 
         tables = self.cur.execute("SELECT name FROM sqlite_master")

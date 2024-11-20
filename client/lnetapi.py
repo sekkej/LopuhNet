@@ -483,11 +483,11 @@ class LNet:
             self.logger.error(f"Event '{event_name}' not found.")
             return
 
-        async def call_event_handlers():
-            for handler in self.events[event_name]:
-                await handler(*args, **kwargs)
-
         if self._loop.is_running():
+            print(event_name)
+            print(self.events[event_name])
+            for handler in self.events[event_name]:
+                self._loop.create_task(handler(*args, **kwargs))
             # self._loop.call_soon_threadsafe(self._loop.create_task, call_event_handlers())
             # asyncio.ensure_future(call_event_handlers(), loop=self._loop)
             # asyncio.to_thread()
