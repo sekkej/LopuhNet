@@ -5,39 +5,9 @@ import os
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, project_root)
 
-import logging
-from colorlog import ColoredFormatter
-
-log_format = (
-    '%(asctime)s '
-    '%(log_color)s'
-    '%(levelname)-8s'
-    '%(reset)s '
-    '%(message)s'
-)
-
-formatter = ColoredFormatter(
-    log_format,
-    datefmt='%Y-%m-%d %H:%M:%S',
-    reset=True,
-    log_colors={
-        'DEBUG': 'cyan',
-        'INFO': 'green',
-        'WARNING': 'yellow',
-        'ERROR': 'red',
-        'CRITICAL': 'red,bg_white',
-    }
-)
-
-handler = logging.StreamHandler()
-handler.setFormatter(formatter)
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-logger.addHandler(handler)
-
 # server.py
 import socket
+from shared.base_logger import logging, base_logger
 from shared.dbmanager import Database, DatabaseException
 from shared.basic_types import User, ServerAccount
 from shared.packets import *
@@ -54,7 +24,7 @@ class Server:
         self.s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         """Socket"""
         
-        self.logger = logger
+        self.logger = logger if logger else base_logger
         """Logger"""
 
         self.db = Database(logger)
@@ -103,7 +73,7 @@ class Server:
             except Exception as e:
                 # Notice that it is really unwanted to use the variable logger like this
                 # So, it is the only place where it's being used like this
-                logger.error(f"An error occurred in {func.__name__}: {traceback.format_exc()}")
+                base_logger.error(f"An error occurred in {func.__name__}: {traceback.format_exc()}")
                 return None
         return wrapper
     
@@ -347,7 +317,7 @@ class Server:
 
 if __name__ == "__main__":
     # try:
-        s = Server(logger)
+        s = Server()
         # import time
         # time.sleep(5)
         # s.ftest()

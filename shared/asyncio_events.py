@@ -10,15 +10,8 @@ class _EventSlot:
         return self
     
     def __call__(self, *args, **kwargs):
-        loop = kwargs.pop('asyncio_loop', None)
-        
         for handler in self.handlers:
-            # asyncio.create_task(handler(*args, **kwargs))
-            # asyncio.ensure_future(handler(*args, **kwargs), loop=loop)
-            # if loop:
-            #     asyncio.get_running_loop
-            # else:
-            # asyncio.run_coroutine_threadsafe(handler(*args, **kwargs), loop=asyncio.get_running_loop())
+            asyncio.create_task(handler(*args, **kwargs))
 
 
 class Events:
@@ -90,7 +83,7 @@ class Events:
 
 # @_events.handler
 # async def on_ready():
-#     print('Started!')
+#     print('Ready!!')
 
 # @_events.handler
 # async def on_message(msg):
@@ -99,15 +92,50 @@ class Events:
 
 # async def main():
 #     # await asyncio.sleep(1)
-    
-#     # ev.on_start += on_start
-#     # ev.on_message += on_message
 #     print("RUNNING START EVENT")
 #     _events.on_start()
-#     _events.on_ready(asyncio_loop=asyncio.get_running_loop())
-#     print("RUNNING MESSAGE EVENT")
-#     _events.on_message('<the message>')
+#     _events.on_ready()
+#     for i in range(3):
+#         print("RUNNING MESSAGE EVENT")
+#         _events.on_message('<the message>')
+#         await asyncio.sleep(.1)
 #     print("CONTINUING MAIN WITH SLEEPING")
 #     await asyncio.sleep(2)
 
+# asyncio.run(main())
+
+# async def producer(queue):
+#     for i in range(2):
+#         await queue.put(i)
+#         await asyncio.sleep(1)
+#     await asyncio.gather(queue.put(1337), queue.put(1488))
+
+# async def consumer(queue):
+#     while True:
+#         item = await queue.get()
+#         print(f'Consuming {item}')
+#         await asyncio.sleep(1)
+
+# async def main():
+#     queue = asyncio.Queue()
+
+#     producer_coro = producer(queue)
+#     consumer_coro = consumer(queue)
+
+#     producer_task = asyncio.create_task(producer_coro)
+#     consumer_task = asyncio.create_task(consumer_coro)
+
+#     await producer_task
+
+#     # Wait until all items have been processed
+#     await queue.join()
+
+#     # Cancel the consumer task when the queue is empty
+#     consumer_task.cancel()
+#     try:
+#         await consumer_task
+#     except asyncio.CancelledError:
+#         print('Consumer was cancelled')
+
+# # Run the main coroutine
 # asyncio.run(main())

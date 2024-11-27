@@ -3,11 +3,11 @@ import base64
 from lnet import LNetAPI, events, types
 
 client = LNetAPI(
-    '193.124.115.81', 9229,
+    # '193.124.115.81', 9229,
+    '127.0.0.1', 9229,
     'lnet.db',
     account_data=json.load(open('data_peterpavel.json', encoding='utf-8'))
 )
-client.logger.setLevel('DEBUG')
 
 @client.event
 async def on_start():
@@ -16,11 +16,7 @@ async def on_start():
 @client.event
 async def on_ready():
     client.logger.info("Ready!")
-    freq_resp = await client.send_friend_request("someoneWhoDoesNotExist")
-    print(freq_resp)
-
-# @client.event
-# async def on_netmessage(data):
-#     client.logger.debug(f"Data: {data}")
+    freq_resp = await client.send_friend_request("sekkej")
+    client.logger.info(freq_resp)
 
 client.start()

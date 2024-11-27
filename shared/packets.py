@@ -4,35 +4,50 @@ import brotli
 import xxhash
 import time
 import json
-from .basic_types import Packet, User
+from .basic_types import Packet, User, ServerAccount
 # from .shared_utils import AESCipher, PacketDNA
 from .shared_utils import CHAKEM, PacketDSA
 from .eventflags import EventFlags
 
-# class Heartbeat(Packet):
-#     def __init__(self,
-#                 sender: User,
-#                 recipient: list[User],
-#                 data: None = None # Used while decoding
-#             ):
-#         super().__init__(sender, recipient, {
-#             'pId':   0x001,
-#             'pName': 'Heartbeat'
-#         })
+class TransmissionRequest(Packet):
+    pId = 0x001
+    pName = 'TransmissionRequest'
 
-# class Ack(Packet):
-#     def __init__(self,
-#                 sender: User,
-#                 recipient: list[User],
-#                 ref_id: str,
-#                 data: None = None # Used while decoding
-#             ):
-#         self.ref_id = ref_id
-#         super().__init__(sender, recipient, {
-#             'pId':   0x002,
-#             'pName': 'Ack',
-#             'ref_id': self.ref_id
-#         })
+    def __init__(self, sender: User, event: 'Event'):
+        super().__init__(sender, event.recipient, {
+            'eid': event.eid,
+            'data': base64.b64encode(bytes(event)).decode()
+        })
+    
+    def __bytes__(self):
+        return self.pId.to_bytes(4, 'big') + super().__bytes__()
+    
+    @classmethod
+    def from_bytes(cls, data):
+        pId = int.from_bytes(data[:4], 'big')
+        if pId != cls.pId:
+            raise RuntimeError(f"Invalid packet id! Expected: {cls.pId}, got {pId}")
+        return super().from_bytes(data[4:])
+
+class TransmissionResult(Packet):
+    pId = 0x002
+    pName = 'TransmissionResult'
+
+    def __init__(self, recipient: User, event_id: str, result: bool):
+        super().__init__(ServerAccount(), recipient, {
+            'eid': event_id,
+            'result': result
+        })
+    
+    def __bytes__(self):
+        return self.pId.to_bytes(4, 'big') + super().__bytes__()
+    
+    @classmethod
+    def from_bytes(cls, data):
+        pId = int.from_bytes(data[:4], 'big')
+        if pId != cls.pId:
+            raise RuntimeError(f"Invalid packet id! Expected: {cls.pId}, got {pId}")
+        return super().from_bytes(data[4:])
 
 class SecurePacket(Packet):
     def __init__(self,
@@ -47,14 +62,8 @@ class SecurePacket(Packet):
         self.recipient_public_key = recipient_public_key
         self.purpose_info = purpose_info
         self.pdsa = sender_packet_dsa
-        # self.key = key
-        # self.iv = os.urandom(16)
     
     def __bytes__(self):
-        # return AESCipher.encrypt(
-        #         brotli.compress(super().__bytes__()),
-        #         key=self.key
-        #     )
         encrypted = CHAKEM.encrypt(
             brotli.compress(super().__bytes__()),
             self.recipient_public_key,
@@ -66,7 +75,7 @@ class SecurePacket(Packet):
         else:
             signature = None
         
-        return json.dumps({
+        return self.pId.to_bytes(4, 'big') + json.dumps({
             'encrypted': base64.b64encode(encrypted[0]).decode(),
             'ciphertext': base64.b64encode(encrypted[1]).decode(),
             'nonce': base64.b64encode(encrypted[2]).decode(),
@@ -81,7 +90,8 @@ class SecurePacket(Packet):
                     peer_sign_public: bytes = None,
                     _verify_signature: bool = True,
                 ):
-        jsondata = json.loads(data)
+        jsondata = json.loads(data[4:])
+        pId = int.from_bytes(data[:4], 'big')
         encdata = base64.b64decode(jsondata['encrypted'])
         cipher_text = base64.b64decode(jsondata['ciphertext'])
         nonce = base64.b64decode(jsondata['nonce'])
@@ -111,9 +121,13 @@ class SecurePacket(Packet):
             if not PacketDSA.verify(encdata, signature, peer_sign_public):
                 raise RuntimeError("PacketDSA SecurePacket verification failure.") # Must be catched.
 
+        decrypted.pId = pId
         return decrypted
 
 class Registration(SecurePacket):
+    pId = 0x010
+    pName = 'Registration'
+
     def __init__(self,
             sender_packet_dsa: PacketDSA,
             recipient_public_key: bytes,
@@ -126,7 +140,7 @@ class Registration(SecurePacket):
         super().__init__(
             sender_packet_dsa,
             recipient_public_key,
-            b'Registration',
+            b'lopuhnet-auth',
             sender,
             recipient,
             {
@@ -137,6 +151,9 @@ class Registration(SecurePacket):
         )
 
 class RegistrationResult(SecurePacket):
+    pId = 0x011
+    pName = 'RegistrationResult'
+
     def __init__(self,
             recipient_public_key: bytes,
             sender: User = None,
@@ -145,13 +162,16 @@ class RegistrationResult(SecurePacket):
             data: None = None # Used while decoding
             ):
         self.message = message
-        super().__init__(None, recipient_public_key, b'Registration', sender, recipient, {
+        super().__init__(None, recipient_public_key, b'lopuhnet-auth', sender, recipient, {
             'pId':   0x011,
             'pName': 'RegistrationResult',
             'message': self.message
         })
 
 class Authentication(SecurePacket):
+    pId = 0x012
+    pName = 'Authentication'
+
     def __init__(self,
             sender_packet_dsa: PacketDSA,
             recipient_public_key: bytes,
@@ -164,7 +184,7 @@ class Authentication(SecurePacket):
         super().__init__(
             sender_packet_dsa,
             recipient_public_key,
-            b'Authentication',
+            b'lopuhnet-auth',
             sender,
             recipient,
             {
@@ -175,6 +195,9 @@ class Authentication(SecurePacket):
         )
 
 class AuthenticationResult(SecurePacket):
+    pId = 0x013
+    pName = 'AuthenticationResult'
+
     def __init__(self,
             recipient_public_key: bytes,
             sender: User = None,
@@ -183,7 +206,7 @@ class AuthenticationResult(SecurePacket):
             data: None = None # Used while decoding
             ):
         self.message = message
-        super().__init__(None, recipient_public_key, b'Authentication', sender, recipient, {
+        super().__init__(None, recipient_public_key, b'lopuhnet-auth', sender, recipient, {
             'pId':   0x013,
             'pName': 'AuthenticationResult',
             'message': self.message
@@ -219,9 +242,16 @@ class Event(SecurePacket):
     def from_bytes(cls,
                     data: bytes,
                     own_private_key: bytes,
-                    peer_sign_public: bytes = None
+                    peer_sign_public: bytes = None,
+                    _verify_signature: bool = True
                 ):
-        return super().from_bytes(data, own_private_key, b'lopuhnet-event', peer_sign_public)
+        return super().from_bytes(
+            data,
+            own_private_key,
+            b'lopuhnet-event',
+            peer_sign_public,
+            _verify_signature
+        )
 
 class FriendRequest(Event):
     pId   = 0x100
@@ -229,19 +259,52 @@ class FriendRequest(Event):
     flags = 0 + EventFlags.DISPOSABLE
 
     def __init__(self,
+            sender_packet_dsa: PacketDSA,
             recipient_public_key: bytes,
             sender: User = None,
             recipient: User = None,
+            user: str | User = None,
             data: None = None # Used while decoding
             ):
+        self.user = user
         super().__init__(
-            None,
+            sender_packet_dsa,
             recipient_public_key,
             sender,
             recipient,
             {
                 'pId':   self.pId,
-                'pName': self.pName
+                'pName': self.pName,
+                'user': self.user
+            }
+        )
+
+class FriendRequestResult(Event):
+    pId   = 0x101
+    pName = 'FriendRequestResult'
+    flags = 0 + EventFlags.DISPOSABLE
+
+    def __init__(self,
+            sender_packet_dsa: PacketDSA,
+            recipient_public_key: bytes,
+            sender: User = None,
+            recipient: User = None,
+            fr_eid: str = None, # EventID of FriendRequest
+            result: tuple = None,
+            data: None = None # Used while decoding
+            ):
+        self.fr_eid = fr_eid
+        self.result = result
+        super().__init__(
+            sender_packet_dsa,
+            recipient_public_key,
+            sender,
+            recipient,
+            {
+                'pId':   self.pId,
+                'pName': self.pName,
+                'request_eid': self.fr_eid,
+                'result': self.result
             }
         )
 

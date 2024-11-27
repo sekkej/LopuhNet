@@ -76,6 +76,8 @@ class Database:
         else:
             fdbuser = self.cur.execute(f"SELECT * FROM users WHERE username='{username}';").fetchone()
         
+        if fdbuser is None:
+            return None
         return User.from_db(fdbuser)
 
     def register(self, user: User, time=time.time()):
