@@ -62,6 +62,37 @@ python3.10 client_async/example.py
 ```
 ### If client is running successfully, without any error or an unexpected stop, it means you have successfully connected to the specified server.
 
+> [!NOTE]
+> If you're interested not only in how to set up the server or use the client, then **you can view more below**.
+> There you can find **the breakdown of how the protocol works, what encryption is being used, packet structure**.
+> If you want to investigate deeply, you can view **project structure** defined below too.
+
+# 🧱 Understanding the protocol, encryption and transmission
+Long story short, the **protocol is quite basic** speaking in general context of how data is being encrypted and transmitted. First of all, **at the lowest level of networking** there are classes like `Packet` and `User`, in `User` we can **access recipient's public key for example**, and using `Packet` we can **construct primitive packet** containing JSON data.
+
+However, **on the higher level of networking** we use `SecurePacket`, which automatically manages to **encrypt and decrypt data** based on our needs. It also **automatically signs** everything we send. We use our `private-signing key` **to sign outcoming messages**, recipient's `public-signing key` **to verify incoming messages**, recipient's `public key` **to encrypt outcoming data** and our `private key` **to decrypt incoming data**.
+Talking in context of cryptography algorithms, `SecurePacket` uses:
+1. [**HKDF**](https://cryptography.io/en/latest/hazmat/primitives/key-derivation-functions/#hkdf) [**over (over SHA-384)**](https://csrc.nist.gov/files/pubs/fips/180-2/final/docs/fips180-2.pdf) used to derive encryption key from generated ones.
+2. [**ChaCha20Poly1305**](https://en.wikipedia.org/wiki/ChaCha20-Poly1305) used to encrypt and decrypt data.
+3. [**Fips 203 (ML-KEM)**](https://csrc.nist.gov/pubs/fips/203/final) used as a key-encapsulation mechanism.
+4. [**Fips 204 (ML-DSA)**](https://csrc.nist.gov/pubs/fips/204/final) used as a signing algorithm.
+
+In case you don't understand why do we need to sign messages, the **LNet Server** has no clue what we're transmitting through it to each other, so it **cannot automatically verify what we send**; at least, **not supposed to**.
+
+On the **higher level of networking**, we use `SecurePacket` to construct `Event`s, *one that is easier to understand*. `Event` class **represents an actual event, that is happened in network**, such as `MsgCreated`, `MsgEdited`, *etc*.
+
+As you've probably guessed, on **the latest networking layer**, that is *the most simple and easiest to understand*, it's **the actual events** like `MsgCreated`, `MsgEdited`, *etc*.
+
+Since **LNet is decentralized**, we **prefer to save everything locally**, including sensetive information like **account credentials** (e.g. keys). That means, we need to **securely save it**, for that we use:
+1. [**PBKDF2**](https://cryptography.io/en/latest/hazmat/primitives/key-derivation-functions/#pbkdf2) [**over (over SHA-256)**](https://csrc.nist.gov/files/pubs/fips/180-2/final/docs/fips180-2.pdf) used to derive encryption key from the password.
+2. [**AES-256**](https://www.nist.gov/publications/advanced-encryption-standard-aes-0) used to encrypt sensetive data based on encryption key.
+
+Since we save everything locally, in **LNet Client** there are implemented:
+1. `AccountData` class for easy and basic management of account data (without encryption).
+2. `DataAutoSaver` class to automatically save account data securely (with encryption).
+> [!TIP]
+> It's **recommended to use** `DataAutoSaver`, as it's **easy-to-use** and **implements secure encryption**.
+
 # 📁 Project structure
 ```bash
 LopuhNet
