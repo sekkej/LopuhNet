@@ -157,21 +157,21 @@ from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
 #         ).derive(shared_key)
 #         return derived_key
 
-class SocketUtils:
-    @staticmethod
-    def compare_addrs(addr1: tuple[str, int], addr2: tuple[str, int]) -> bool:
-        """Compare two addresses
+# class SocketUtils:
+#     @staticmethod
+#     def compare_addrs(addr1: tuple[str, int], addr2: tuple[str, int]) -> bool:
+#         """Compare two addresses
 
-        Args:
-            addr1 (tuple[str, int]): first IP and port
-            addr2 (tuple[str, int]): second IP and port
+#         Args:
+#             addr1 (tuple[str, int]): first IP and port
+#             addr2 (tuple[str, int]): second IP and port
 
-        Returns:
-            bool: are they the same
-        """
-        true_addr1 = addr1[0].replace('127.0.0.1', 'localhost').replace('0.0.0.0', 'localhost')
-        true_addr2 = addr2[0].replace('127.0.0.1', 'localhost').replace('0.0.0.0', 'localhost')
-        return true_addr1 == true_addr2 and addr1[1] == addr2[1]
+#         Returns:
+#             bool: are they the same
+#         """
+#         true_addr1 = addr1[0].replace('127.0.0.1', 'localhost').replace('0.0.0.0', 'localhost')
+#         true_addr2 = addr2[0].replace('127.0.0.1', 'localhost').replace('0.0.0.0', 'localhost')
+#         return true_addr1 == true_addr2 and addr1[1] == addr2[1]
 
 # Replaced with ML-DSA
 # class PacketDNA:
