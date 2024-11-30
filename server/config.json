@@ -1,5 +1,10 @@
 {
     "host": "127.0.0.1",
     "port": 9229,
-    "max_num_cached_events": 16
+    "max_num_cached_events": 16,
+    "register_captcha_enabled": true,
+    "register_pow_alg_enabled": true,
+    "_register_pow_alg_linear_const": 0.4,
+    "_register_pow_alg_linear_min": 1,
+    "_register_pow_alg_linear_max": 5
 }

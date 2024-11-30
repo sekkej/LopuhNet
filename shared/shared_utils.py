@@ -1,8 +1,13 @@
 import os
+
+import base64
+import json
+
 # import socket
 # import random
-# import hashlib
+import hashlib
 # import time
+
 # from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.padding import PKCS7
@@ -10,9 +15,216 @@ from cryptography.hazmat.primitives.asymmetric import ec, rsa, padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives.serialization import load_der_public_key, load_der_private_key
-from .kyber_py.ml_kem import ML_KEM_1024
-from .dilithium_py.ml_dsa import ML_DSA_87
+from kyber_py.ml_kem import ML_KEM_1024
+from dilithium_py.ml_dsa import ML_DSA_87
 from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
+
+from multicolorcaptcha import CaptchaGenerator
+from PIL.Image import Image
+
+class PacketDSA:
+    def __init__(self, public_key: bytes = None, private_key: bytes = None):
+        if private_key is not None and public_key is not None:
+            self.public = public_key
+            self.private = private_key
+        else:
+            self.public, self.private = ML_DSA_87.keygen()
+    
+    def sign(self, packet_data: bytes):
+        return ML_DSA_87.sign(self.private, packet_data)
+    
+    @staticmethod
+    def verify(data: bytes, signature: bytes, peer_public: bytes):
+        return ML_DSA_87.verify(peer_public, data, signature)
+
+class CHAKEM:
+    """Encryption based on ML-KEM and ChaCha20Poly1305 and signing with ML-DSA"""
+    @staticmethod
+    def generate_keys() -> tuple[bytes, bytes]:
+        return ML_KEM_1024.keygen()
+
+    @staticmethod
+    def encrypt(
+            data: bytes,
+            recipient_public_key: bytes,
+            # own_private_signkey: bytes,
+            purpose: bytes
+        ) -> tuple[bytes, bytes, bytes]:
+        shared_secret, ciphertext = ML_KEM_1024.encaps(recipient_public_key)
+        derived_key = HKDF(
+            algorithm=hashes.SHA384(),
+            length=32,
+            salt=None,
+            info=purpose,
+        ).derive(shared_secret)
+
+        nonce = os.urandom(12)
+        encrypted = ChaCha20Poly1305(derived_key) \
+                        .encrypt(nonce, data, associated_data=None)
+        
+        # signature = ML_DSA_87.sign(own_private_signkey, encrypted)
+        
+        return encrypted, ciphertext, nonce #, signature
+    
+    @staticmethod
+    def decrypt(
+            data: bytes,
+            own_private_key: bytes,
+            cipher_text: bytes,
+            nonce: bytes,
+            # sender_public_signkey: bytes,
+            # signature: bytes,
+            purpose: bytes
+        ) -> bytes:
+        # if not ML_DSA_87.verify(sender_public_signkey, data, signature):
+        #     raise RuntimeError("Data verification by signature has failed!")
+
+        shared_secret = ML_KEM_1024.decaps(own_private_key, cipher_text)
+        derived_key = HKDF(
+            algorithm=hashes.SHA384(),
+            length=32,
+            salt=None,
+            info=purpose,
+        ).derive(shared_secret)
+
+        decrypted = ChaCha20Poly1305(derived_key) \
+                        .decrypt(nonce, data, associated_data=None)
+        
+        return decrypted
+
+class ProofOfWorkSession:
+    def __init__(self, difficulty=5, extra_difficulty=2, salt_length=32):
+        """Create server-side session of PoW algorithm that client has to solve.
+
+        Args:
+            difficulty (int, optional): difficulty of PoW algorithm (number of zeros in hash prefix). Defaults to 5.
+            extra_difficulty (int, optional): extra difficulty of PoW algorithm (number of hashes). Defaults to 2.
+            salt_length (int, optional): length of hashes' salt. Defaults to 32.
+        """
+        self.difficulty = difficulty
+        self.extra_difficulty = extra_difficulty
+        self.salt = os.urandom(salt_length)
+
+    @property
+    def params_json(self) -> dict:
+        """Serialize current session's parameters into dictionary. 
+
+        Returns:
+            dict: PoW algorithm parameters
+        """
+        return {
+            'difficulty': self.difficulty,
+            'extra_difficulty': self.extra_difficulty,
+            'salt': base64.b64encode(self.salt).decode()
+        }
+    
+    @staticmethod
+    def __solve_task(data: bytes, salt: bytes, difficulty: int, extra_difficulty: int) -> list[tuple[bytes, str]]:
+        found_nonces = []
+        nonce = os.urandom(16)
+        found_nonces.append(nonce)
+        found_hashes = [hashlib.sha256(data + salt + nonce)]
+        for i in range(extra_difficulty):
+            latest_hash = found_hashes[len(found_hashes)-1].digest()
+            while True:
+                hash_result = hashlib.sha256(latest_hash + salt + nonce)
+                if hash_result.hexdigest()[:difficulty] == '0' * difficulty:
+                    found_hashes.append(hash_result)
+                    found_nonces.append(nonce)
+                    break
+                nonce = os.urandom(16)
+        return list(zip(found_nonces, [h.hexdigest() for h in found_hashes]))
+
+    @staticmethod
+    def solve(data: bytes, params_json: dict) -> dict:
+        """Solve the task from given parameters and data.
+
+        Args:
+            data (bytes): data that you want to transmit to server, after verification
+            params_json (dict): task parameters given by server
+
+        Returns:
+            dict: encoded solution and data
+        """
+        difficulty = params_json['difficulty']
+        extra_difficulty = params_json['extra_difficulty']
+        salt = base64.b64decode(params_json['salt'])
+        solution = ProofOfWorkSession.__solve_task(data, salt, difficulty, extra_difficulty)
+        solution = [(base64.b64encode(nonce).decode(), rhash) for nonce, rhash in solution]
+        data = base64.b64encode(data).decode()
+        return {'solution': solution, 'data': data}
+    
+    @staticmethod
+    def __verify_solution(data: bytes, salt: bytes, difficulty: int, extra_difficulty: int, solution: list[tuple[bytes, str]]) -> tuple[bool, str]:
+        if len(solution) != extra_difficulty + 1: # +1 initial hash
+            return False, "Extra difficulty solution mismatch."
+        
+        prev_data = data
+        required_hash_prefix = '0' * difficulty
+
+        for i, solution_part in enumerate(solution):
+            nonce, resulted_hash = solution_part
+            if i > 0 and not resulted_hash.startswith(required_hash_prefix):
+                return False, "Resulted hash prefix does not match it's difficulty."
+            
+            recomputed = hashlib.sha256(prev_data + salt + nonce)
+            if recomputed.hexdigest() != resulted_hash:
+                return False, f"Incorrect hash result at index: {i}."
+            
+            prev_data = recomputed.digest()
+        
+        return True, "Verification succeed!"
+    
+    def verify_solution(self, solution_data: dict) -> tuple[bool, str, bytes]:
+        """Verify client's solution for the given task.
+        Note, that after this function called by server this class must be unused for security reasons.
+
+        Args:
+            solution_data (dict): provided solution data by the client
+
+        Returns:
+            tuple[bool, str, bytes]: verification result boolean (True if verified), verification result message, client's provided data
+        """
+        data = base64.b64decode(solution_data['data'])
+        solution = solution_data['solution']
+        solution = [(base64.b64decode(nonce), rhash) for nonce, rhash in solution]
+        return (*self.__verify_solution(data, self.salt, self.difficulty, self.extra_difficulty, solution), data)
+
+class CaptchaManager:
+    def __init__(self, digits_num: int = 4, difficulty: int = 2):
+        """Create server-side manager of an image captcha test.
+
+        Args:
+            digits_num (int, optional): number of digits in captcha. Defaults to 4.
+            difficulty (int, optional): difficulty of the captcha. Defaults to 2.
+        """
+        self.generator = CaptchaGenerator(digits_num)
+        self.difficulty = difficulty
+    
+    def generate(self) -> tuple[str, Image]:
+        """Generate the captcha with current parameters.
+
+        Returns:
+            _type_: _description_
+        """
+        generated = self.generator.gen_captcha_image(difficult_level=self.difficulty, margin=False)
+        return generated.characters, generated.image
+
+# Deep below there is no God anymore...
+
+# captcha = CaptchaManager()
+# captcha.generate()[1].show()
+
+# powsess = ProofOfWorkSession(extra_difficulty=3)
+# powsess.params_json # S->C
+# print(powsess.params_json)
+
+# csolved = ProofOfWorkSession.solve(b'test', powsess.params_json) # C->S
+# print(csolved)
+
+# verification = powsess.verify_solution(csolved)
+# print(verification)
+
 # from Crypto.Cipher import AES
 # from Crypto.Util.Padding import pad, unpad
 
@@ -244,21 +456,6 @@ from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
 #             """
 #             super().__init__(message, *args)
 
-class PacketDSA:
-    def __init__(self, public_key: bytes = None, private_key: bytes = None):
-        if private_key is not None and public_key is not None:
-            self.public = public_key
-            self.private = private_key
-        else:
-            self.public, self.private = ML_DSA_87.keygen()
-    
-    def sign(self, packet_data: bytes):
-        return ML_DSA_87.sign(self.private, packet_data)
-    
-    @staticmethod
-    def verify(data: bytes, signature: bytes, peer_public: bytes):
-        return ML_DSA_87.verify(peer_public, data, signature)
-
 # Deprecated implementation
 # class CHAKEMDSA:
     # """Encryption based on ML-KEM and ChaCha20Poly1305 and signing with ML-DSA"""
@@ -343,61 +540,6 @@ class PacketDSA:
 #         if not CHAKEMDSA.verify_signature(data, peer_sign_public, signature):
 #             raise RuntimeError("Signature verification failed!")
 #         return self.decrypt_data(data, peer_public_key, nonce, purpose)
-
-class CHAKEM:
-    """Encryption based on ML-KEM and ChaCha20Poly1305 and signing with ML-DSA"""
-    @staticmethod
-    def generate_keys() -> tuple[bytes, bytes]:
-        return ML_KEM_1024.keygen()
-
-    @staticmethod
-    def encrypt(
-            data: bytes,
-            recipient_public_key: bytes,
-            # own_private_signkey: bytes,
-            purpose: bytes
-        ) -> tuple[bytes, bytes, bytes]:
-        shared_secret, ciphertext = ML_KEM_1024.encaps(recipient_public_key)
-        derived_key = HKDF(
-            algorithm=hashes.SHA384(),
-            length=32,
-            salt=None,
-            info=purpose,
-        ).derive(shared_secret)
-
-        nonce = os.urandom(12)
-        encrypted = ChaCha20Poly1305(derived_key) \
-                        .encrypt(nonce, data, associated_data=None)
-        
-        # signature = ML_DSA_87.sign(own_private_signkey, encrypted)
-        
-        return encrypted, ciphertext, nonce #, signature
-    
-    @staticmethod
-    def decrypt(
-            data: bytes,
-            own_private_key: bytes,
-            cipher_text: bytes,
-            nonce: bytes,
-            # sender_public_signkey: bytes,
-            # signature: bytes,
-            purpose: bytes
-        ) -> bytes:
-        # if not ML_DSA_87.verify(sender_public_signkey, data, signature):
-        #     raise RuntimeError("Data verification by signature has failed!")
-
-        shared_secret = ML_KEM_1024.decaps(own_private_key, cipher_text)
-        derived_key = HKDF(
-            algorithm=hashes.SHA384(),
-            length=32,
-            salt=None,
-            info=purpose,
-        ).derive(shared_secret)
-
-        decrypted = ChaCha20Poly1305(derived_key) \
-                        .decrypt(nonce, data, associated_data=None)
-        
-        return decrypted
 
 # enckey, deckey = CHAKEM.generate_keys()
 # enc = CHAKEM.encrypt(b'test', enckey, b'Purpose!')

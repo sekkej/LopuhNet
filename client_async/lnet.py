@@ -371,12 +371,12 @@ class LNetAPI:
         """## Creates an instance of LNet API Wrapper
 
         Args:
-            server_host (str): Server's hostname (e.g.: server's IP)
-            server_port (int): Server's listening port (hint: it's set 9229 by default on server-side)
-            database_path (str, optional): Specific path to the database file. Defaults to 'lnet.db'.
-            autosaver (DataAutoSaver, optional): Automatically encrypts AccountData and saves into JSON file each time it gets updated. Recommended to use!. Defaults to None.
-            account_data (AccountData, optional): Instance of AccountData containing your account's credentials and other data. Defaults to None.
-            logger (logging.Logger, optional): Custom logger. Defaults to base_logger.
+            server_host (str): server's hostname (e.g.: server's IP)
+            server_port (int): server's listening port (hint: it's set 9229 by default on server-side)
+            database_path (str, optional): specific path to the database file. Defaults to 'lnet.db'.
+            autosaver (DataAutoSaver, optional): automatically encrypts AccountData and saves into JSON file each time it gets updated. Recommended to use!. Defaults to None.
+            account_data (AccountData, optional): instance of AccountData containing your account's credentials and other data. Defaults to None.
+            logger (logging.Logger, optional): custom logger. Defaults to base_logger.
         """
 
         # Configure server address
@@ -424,9 +424,11 @@ class LNetAPI:
           - on_message_delete: calls after someone deleted their message.
         """
         self.logger = logger
+        """LNet Client logger"""
 
         # Initialize DB
         self._database = Database(logger, database_path)
+        """Client-side database instance"""
 
         # Initialize user data
         self._public_key = None
@@ -441,6 +443,7 @@ class LNetAPI:
         # Read user data
         if account_data:
             self.user = account_data.user
+            """Self `User` instance"""
             self._pdsa = account_data.pdsa
             self._private_key = account_data.private_key
             self._public_key = account_data.public_key
@@ -451,9 +454,11 @@ class LNetAPI:
             self._public_key, self._private_key = CHAKEM.generate_keys()
         
         self.authorized = False
+        """Sets to `True` after successful authorization (or registration)."""
 
         # Autosave configuration
         self.autosaver = autosaver
+        """Configured `DataAutoSaver` instance"""
         # self.autosave_enabled = autosave_data
         # self.autosave_path = autosave_path
 
@@ -471,9 +476,19 @@ class LNetAPI:
         self.event(self.on_netmessage)
 
     def event(self, func):
+        """Decorator for event-handling functions
+
+        Args:
+            func (function): a coroutine-like function
+        """
         self.events.handler(func)
 
     async def send(self, data: bytes):
+        """Send data to server
+
+        Args:
+            data (bytes): data to send
+        """
         # Affirm data length
         self._writer.write(len(data).to_bytes(4, 'big'))
         await self._writer.drain()
@@ -498,17 +513,42 @@ class LNetAPI:
         return bytes(data)
 
     async def receive(self):
+        """Awaits data from server
+
+        Returns:
+            bytes: received data
+        """
         data_length = await self._reader.read(4) # Read data length
         return await self._receive(int.from_bytes(data_length, 'big'))
 
     async def close_connection(self):
+        """Closes connection with the server
+        """
         self._writer.close()
         await self._writer.wait_closed()
 
     def _get_avatar_seed(self, seed: str) -> int:
+        """Returns avatar seed as an integer
+
+        Args:
+            seed (str): seed-phrase
+
+        Returns:
+            int: seed represented as integer
+        """
         return xxhash.xxh128(seed).intdigest() % (10 ** 10)
 
     async def authorize(self):
+        """Authorizes user.
+
+        Raises:
+            RuntimeError: if have been authorized already.
+            RuntimeError: if no account credentials given.
+            RuntimeError: if error occurrs during authorization.
+
+        Returns:
+            tuple[bool, str]: result
+        """
         self.logger.info(f"Requesting authentication...")
 
         if self.authorized:
@@ -552,6 +592,19 @@ class LNetAPI:
         return True, 'Ready to use!'
 
     async def register(self, name: str, username: str, avatar_seed: str):
+        """Registers user and saves all credentials.
+
+        Args:
+            name (str): user's display name
+            username (str): user's unique username
+            avatar_seed (str): user's avatar seed
+
+        Raises:
+            RuntimeError: if have been authorized already.
+
+        Returns:
+            tuple[bool, str]: result
+        """
         self.logger.info("Registrating user...")
 
         if self.authorized:
@@ -585,8 +638,6 @@ class LNetAPI:
 
         if registration_result['message'] == 'Success!':
             self.logger.info("Successfully registered! Saving all the data...")
-
-            self._database.register(user)
 
             self.user = user
             self.authorized = True
@@ -751,10 +802,14 @@ class LNetAPI:
     async def on_group_registry(self, group: types.Group):
         self._groups[group.groupid] = group
 
-    async def close(self):
+    async def stop(self):
+        """Stops the LNet Client
+        """
         self._running = False
         await self.close_connection()
         self.logger.info("Connection closed")
 
     def start(self):
+        """Starts the LNet Client
+        """
         asyncio.run(self._run())
