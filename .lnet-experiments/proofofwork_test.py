@@ -42,37 +42,37 @@ def verify_solution(data: bytes, salt: bytes, difficulty: int, extra_difficulty:
     
     return True, "Verification succeed!"
 
-# Server generates a task
-difficulty, extra_difficulty, salt = generate_task()
+# # Server generates a task
+# difficulty, extra_difficulty, salt = generate_task()
 
-# Client prepares the transmission data
-# and solves the task based on all parameters
-data = b'Register{user="Test"}'
-start_time = time.time()
-solution = solve_task(data, salt, difficulty, extra_difficulty)
-print(f"Solution: {solution} Time: {time.time() - start_time}")
+# # Client prepares the transmission data
+# # and solves the task based on all parameters
+# data = b'Register{user="Test"}'
+# start_time = time.time()
+# solution = solve_task(data, salt, difficulty, extra_difficulty)
+# print(f"Solution: {solution} Time: {time.time() - start_time}")
 
-# Server verifies solution.
-# If first value is True, then proceed client's request.
-verification = verify_solution(data, salt, difficulty, extra_difficulty, solution)
-print('Verification:', verification)
+# # Server verifies solution.
+# # If first value is True, then proceed client's request.
+# verification = verify_solution(data, salt, difficulty, extra_difficulty, solution)
+# print('Verification:', verification)
 
-# Run tests
-assert verification[0] == True
+# # Run tests
+# assert verification[0] == True
 
-verification = verify_solution(data, salt, difficulty+1, extra_difficulty, solution)
-assert verification[0] == False
+# verification = verify_solution(data, salt, difficulty+1, extra_difficulty, solution)
+# assert verification[0] == False
 
-verification = verify_solution(data, salt, difficulty, extra_difficulty+1, solution)
-assert verification[0] == False
+# verification = verify_solution(data, salt, difficulty, extra_difficulty+1, solution)
+# assert verification[0] == False
 
-verification = verify_solution(data, salt, difficulty+1, extra_difficulty+1, solution)
-assert verification[0] == False
+# verification = verify_solution(data, salt, difficulty+1, extra_difficulty+1, solution)
+# assert verification[0] == False
 
-verification = verify_solution(data, os.urandom(32), difficulty, extra_difficulty, solution)
-assert verification[0] == False
+# verification = verify_solution(data, os.urandom(32), difficulty, extra_difficulty, solution)
+# assert verification[0] == False
 
-verification = verify_solution(data, os.urandom(16), difficulty, extra_difficulty, solution)
-assert verification[0] == False
+# verification = verify_solution(data, os.urandom(16), difficulty, extra_difficulty, solution)
+# assert verification[0] == False
 
-print("All tests passed!")
+# print("All tests passed!")

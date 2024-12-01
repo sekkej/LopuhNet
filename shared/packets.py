@@ -150,8 +150,65 @@ class Registration(SecurePacket):
             }
         )
 
-class RegistrationResult(SecurePacket):
+class RegistrationConfirmationRequest(SecurePacket):
     pId = 0x011
+    pName = 'RegistrationConfirmationRequest'
+
+    def __init__(self,
+            recipient_public_key: bytes,
+            sender: User = None,
+            recipient: list[User] = None,
+            captcha_image: str = None,
+            proof_of_work_params: dict = None,
+            data: None = None # Used while decoding
+            ):
+        self.captcha_image = captcha_image
+        self.proof_of_work_params = proof_of_work_params
+        super().__init__(
+            None,
+            recipient_public_key,
+            b'lopuhnet-auth',
+            sender,
+            recipient,
+            {
+                'pId':   0x011,
+                'pName': 'RegistrationConfirmationRequest',
+                'captcha_image': self.captcha_image,
+                'proof_of_work_params': self.proof_of_work_params
+            }
+        )
+
+class RegistrationConfirmation(SecurePacket):
+    pId = 0x012
+    pName = 'RegistrationConfirmation'
+
+    def __init__(self,
+            sender_packet_dsa: PacketDSA,
+            recipient_public_key: bytes,
+            sender: User = None,
+            recipient: list[User] = None,
+            captcha_solution: str = None,
+            proof_of_work_solution: dict = None,
+            data: None = None # Used while decoding
+            ):
+        self.captcha_solution = captcha_solution
+        self.proof_of_work_solution = proof_of_work_solution
+        super().__init__(
+            sender_packet_dsa,
+            recipient_public_key,
+            b'lopuhnet-auth',
+            sender,
+            recipient,
+            {
+                'pId':   0x012,
+                'pName': 'RegistrationConfirmation',
+                'captcha_solution': self.captcha_solution,
+                'proof_of_work_solution': self.proof_of_work_solution
+            }
+        )
+
+class RegistrationResult(SecurePacket):
+    pId = 0x013
     pName = 'RegistrationResult'
 
     def __init__(self,
@@ -163,13 +220,13 @@ class RegistrationResult(SecurePacket):
             ):
         self.message = message
         super().__init__(None, recipient_public_key, b'lopuhnet-auth', sender, recipient, {
-            'pId':   0x011,
+            'pId':   0x013,
             'pName': 'RegistrationResult',
             'message': self.message
         })
 
 class Authentication(SecurePacket):
-    pId = 0x012
+    pId = 0x014
     pName = 'Authentication'
 
     def __init__(self,
@@ -188,14 +245,14 @@ class Authentication(SecurePacket):
             sender,
             recipient,
             {
-                'pId':   0x012,
+                'pId':   0x014,
                 'pName': 'Authentication',
                 'user': self.user
             }
         )
 
 class AuthenticationResult(SecurePacket):
-    pId = 0x013
+    pId = 0x015
     pName = 'AuthenticationResult'
 
     def __init__(self,
@@ -207,7 +264,7 @@ class AuthenticationResult(SecurePacket):
             ):
         self.message = message
         super().__init__(None, recipient_public_key, b'lopuhnet-auth', sender, recipient, {
-            'pId':   0x013,
+            'pId':   0x015,
             'pName': 'AuthenticationResult',
             'message': self.message
         })

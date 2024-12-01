@@ -14,12 +14,16 @@ from shared.base_logger import logging, base_logger
 from shared.dbmanager import Database
 from shared.basic_types import User, ServerAccount
 from shared.packets import *
+from shared.shared_utils import ProofOfWorkSession, CaptchaManager
 
 import base64
 import hashlib
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 import traceback
+
+from io import BytesIO
+from PIL import Image
 
 class AccountData:
     """
@@ -392,7 +396,7 @@ class LNetAPI:
 
             # Specifically API Client events
             *(
-                'on_start', 'on_ready',
+                'on_start', 'on_registration_captcha', 'on_ready',
             ),
 
             # Friend requests events
@@ -416,6 +420,7 @@ class LNetAPI:
 
         Breakdown of available useful events:
           - on_start (required): calls when client starts; in this event you must register or authorize via server.
+          - on_registration_captcha (required): if server is configured so, it requires from you to solve a captcha, you have to handle this event.
           - on_ready: calls after successful authorization and readiness to receive data.
           - on_friend_request: calls after receiving a friend request.
           - on_friend_request_accepted: calls after specific user accepted your friend request.
@@ -471,6 +476,7 @@ class LNetAPI:
         self._transmission_results = {}
         self._frequests = {}
         self._statuses = {}
+        self._captcha_solution = None
 
         # Initialize on_netmessage event
         self.event(self.on_netmessage)
@@ -591,6 +597,14 @@ class LNetAPI:
 
         return True, 'Ready to use!'
 
+    async def solve_captcha(self, answer: str):
+        """Provide the answer to currently processing registration captcha.
+
+        Args:
+            answer (str): captcha solution (e.g.: 1234)
+        """
+        self._captcha_solution = answer
+
     async def register(self, name: str, username: str, avatar_seed: str):
         """Registers user and saves all credentials.
 
@@ -622,6 +636,46 @@ class LNetAPI:
                 sender=user,
                 recipient=ServerAccount(),
                 user=user
+            ))
+        )
+
+        try:
+            reg_confirm_data = SecurePacket.from_bytes(
+                (await self.receive()),
+                self._private_key,
+                b'lopuhnet-auth',
+                _verify_signature=False
+            ).data
+        except:
+            self.logger.error('RegistrationConfirmationRequest packet decryption error, might be a packet mismatch.')
+            return False, 'Expected RegistrationResultRequest packet from server, got unknown one.'
+        
+        self.logger.debug("Processing RegistrationConfirmationRequest packet...")
+
+        proof_of_work = ProofOfWorkSession.solve(
+                b'Your name here. To be serious, you can implement anything you want here.',
+                reg_confirm_data['proof_of_work_params']
+        ) if reg_confirm_data['proof_of_work_params'] else None
+
+        if reg_confirm_data['captcha_image']:
+            self._captcha_solution = None
+            captcha_image = Image.open(BytesIO(
+                base64.b64decode(reg_confirm_data['captcha_image'])
+            ))
+            self.events.on_registration_captcha(captcha_image)
+            self.logger.debug("Awaiting user's interaction - captcha solution...")
+
+            while self._captcha_solution is None:
+                await asyncio.sleep(.1)
+        
+        await self.send(
+            bytes(RegistrationConfirmation(
+                self._pdsa,
+                self._server_public,
+                sender=user,
+                recipient=ServerAccount(),
+                captcha_solution=self._captcha_solution,
+                proof_of_work_solution=proof_of_work
             ))
         )
 
@@ -684,7 +738,7 @@ class LNetAPI:
                     self._friends = account_data.friends
                     self._groups = account_data.groups
                 except Exception as e:
-                    self.logger.warning(f"Reading auto-save file errored with:\n{e}.\n If this happened meanwhile you were not registered, or if you were doing the registration process, then ignore this.")
+                    self.logger.warning(f"Error occured while reading auto-save file:\n{e}.\n If this happened meanwhile you were not registered, or if you were doing the registration process, then ignore this.")
 
         await self.connect()
         await self._fetch_server_key()

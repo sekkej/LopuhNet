@@ -1,10 +1,19 @@
 {
+    "Welcome to the basic LNet Server JSON configurator!":
+    "Here you can properly configure your server based on your needs.",
+
     "host": "127.0.0.1",
     "port": 9229,
     "max_num_cached_events": 16,
     "register_captcha_enabled": true,
+    "register_captcha_number_of_digits": 4,
     "register_pow_alg_enabled": true,
-    "_register_pow_alg_linear_const": 0.4,
-    "_register_pow_alg_linear_min": 1,
-    "_register_pow_alg_linear_max": 5
+    "register_pow_alg_difficulty": 5,
+    "register_pow_alg_exdifficulty": 2,
+
+    "All settings below considered as low-level.":
+    "Change them only if you know what are you doing!",
+
+    "_register_captcha_difficulty": 2,
+    "_register_pow_alg_salt_length": 32
 }

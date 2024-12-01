@@ -15,8 +15,8 @@ from cryptography.hazmat.primitives.asymmetric import ec, rsa, padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives.serialization import load_der_public_key, load_der_private_key
-from kyber_py.ml_kem import ML_KEM_1024
-from dilithium_py.ml_dsa import ML_DSA_87
+from .kyber_py.ml_kem import ML_KEM_1024
+from .dilithium_py.ml_dsa import ML_DSA_87
 from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
 
 from multicolorcaptcha import CaptchaGenerator

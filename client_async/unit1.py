@@ -1,6 +1,7 @@
 import json
 import asyncio
 from lnet import LNetAPI, DataAutoSaver, AccountData, events, types
+from PIL import Image
 
 autosaver = DataAutoSaver("Unit1's very secret password", autosave_path='client_async/account_data.json')
 client = LNetAPI(
@@ -26,10 +27,15 @@ async def on_start():
 @client.event
 async def on_ready():
     client.logger.info("Client is ready!")
-    client.logger.info(autosaver._data)
+    # client.logger.info(autosaver._data)
 
 @client.event
 async def on_friend_request(user: types.User):
     client.logger.info(f"friend request from: {user.username}")
+
+@client.event
+async def on_registration_captcha(captcha_img: Image.Image):
+    captcha_img.show()
+    await client.solve_captcha(input())
 
 client.start()

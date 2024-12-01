@@ -9,13 +9,16 @@ import asyncio
 import json
 import base64
 
-from shared.asyncio_events import Events, _EventSlot
+from shared.asyncio_events import Events
 from shared.base_logger import logging, base_logger
 from shared.dbmanager import Database
 from shared.basic_types import User, ServerAccount
 from shared.packets import *
+from shared.shared_utils import ProofOfWorkSession, CaptchaManager
 
 import traceback
+
+from io import BytesIO
 
 class Peer:
     """Peer model"""
@@ -77,7 +80,17 @@ class Server:
         # Read config
         self.host = config['host']
         self.port = config['port']
+
         self.max_num_cached_events = config['max_num_cached_events']
+
+        self.captcha_enabled = config['register_captcha_enabled']
+        self.captcha_digits_num = config['register_captcha_number_of_digits']
+        self.captcha_difficulty = config['_register_captcha_difficulty']
+
+        self.pow_alg_enabled = config['register_pow_alg_enabled']
+        self.pow_alg_diff = config['register_pow_alg_difficulty']
+        self.pow_alg_exdiff = config['register_pow_alg_exdifficulty']
+        self.pow_alg_saltlen = config['_register_pow_alg_salt_length']
         
         # Initialize database
         self.db = Database(logger)
@@ -92,7 +105,7 @@ class Server:
 
             # Authentication processor
             *(
-                'on_registration', 'on_authorization'
+                'on_registration', 'on_registration_confirmation', 'on_authorization'
             ),
 
             # Friend requests
@@ -111,19 +124,105 @@ class Server:
         """Contains information about connected peers, like their auth state."""
         self.peers : dict[Peer, dict]
 
+        # Initialize captcha manager
+        self.captcha = CaptchaManager(self.captcha_digits_num, self.captcha_difficulty)
+
         self.event(self.on_netmessage)
         self.event(self.on_registration)
+        self.event(self.on_registration_confirmation)
         self.event(self.on_authorization)
         self.event(self.on_friend_request)
 
     def event(self, func):
         self.events.handler(func)
 
-    async def on_registration(self, peer: Peer, packet: Registration):
-        self.logger.info('Received Registration packet, proceeding...')
-        registration_data = packet.data
-        
+    async def on_registration_confirmation(self, peer: Peer, confirmation_packet: RegistrationConfirmation):
+        self.logger.info('Received RegistrationConfirmation packet, proceeding...')
+
+        registration_data = self.peers[peer.address]['registration']['data']
         client_user = User(**registration_data['user'])
+
+        if 'registration' not in self.peers[peer.address]:
+            self.logger.error("Peer tried to confirm uninitialized registration.")
+            await peer.send(
+                bytes(RegistrationResult(
+                    base64.b64decode(registration_data['user']['public_key']),
+                    sender=ServerAccount(),
+                    recipient=client_user,
+                    message="Peer tried to confirm uninitialized registration."
+                ))
+            )
+            return
+        
+        if self.peers[peer.address]['registration'] is None:
+            self.logger.error("Peer tried to confirm uninitialized registration.")
+            await peer.send(
+                bytes(RegistrationResult(
+                    base64.b64decode(registration_data['user']['public_key']),
+                    sender=ServerAccount(),
+                    recipient=client_user,
+                    message="Peer tried to confirm uninitialized registration."
+                ))
+            )
+            return
+        
+        confirmation_data = confirmation_packet.data
+
+        captcha_solution = confirmation_data['captcha_solution']
+        pow_solution = confirmation_data['proof_of_work_solution']
+
+        if self.captcha_enabled:
+            if not captcha_solution:
+                self.logger.error("Peer tried to confirm registration without solving Captcha.")
+                await peer.send(
+                    bytes(RegistrationResult(
+                        base64.b64decode(registration_data['user']['public_key']),
+                        sender=ServerAccount(),
+                        recipient=client_user,
+                        message="Peer tried to confirm registration without solving Captcha."
+                    ))
+                )
+                return
+            
+            if self.peers[peer.address]['registration']['captcha'][0] != captcha_solution:
+                self.logger.error("Peer solved captcha incorrectly.")
+                await peer.send(
+                    bytes(RegistrationResult(
+                        base64.b64decode(registration_data['user']['public_key']),
+                        sender=ServerAccount(),
+                        recipient=client_user,
+                        message="Peer solved captcha incorrectly."
+                    ))
+                )
+                return
+        
+        if self.pow_alg_enabled:
+            if not pow_solution:
+                self.logger.error("Peer tried to confirm registration without solving Proof-of-Work.")
+                await peer.send(
+                    bytes(RegistrationResult(
+                        base64.b64decode(registration_data['user']['public_key']),
+                        sender=ServerAccount(),
+                        recipient=client_user,
+                        message="Peer tried to confirm registration without solving Proof-of-Work."
+                    ))
+                )
+                return
+            
+            pow_verification = self.peers[peer.address]['registration']['proof_of_work'].verify_solution(pow_solution)
+            if pow_verification[0] != True:
+                self.logger.error(f"Peer solved PoW incorrectly: {pow_verification[1]}")
+                await peer.send(
+                    bytes(RegistrationResult(
+                        base64.b64decode(registration_data['user']['public_key']),
+                        sender=ServerAccount(),
+                        recipient=client_user,
+                        message=f"Peer solved PoW incorrectly: {pow_verification[1]}"
+                    ))
+                )
+                return
+        
+        self.logger.debug("Peer completed registration confirmation, proceeding...")
 
         try:
             registration_result = self.db.register(client_user)
@@ -152,6 +251,34 @@ class Server:
                     message='Internal error.'
                 ))
             )
+    
+    async def on_registration(self, peer: Peer, packet: Registration):
+        self.logger.info('Received Registration packet, proceeding...')
+        self.peers[peer.address]['registration'] = {}
+        self.peers[peer.address]['registration']['data'] = packet.data
+
+        self.peers[peer.address]['registration']['captcha'] = self.captcha.generate() if self.captcha_enabled else None
+        self.peers[peer.address]['registration']['proof_of_work'] = ProofOfWorkSession(
+            self.pow_alg_diff,
+            self.pow_alg_exdiff,
+            self.pow_alg_saltlen
+        ) if self.pow_alg_enabled else None
+
+        captcha_io = BytesIO()
+        if self.captcha_enabled:
+            self.peers[peer.address]['registration']['captcha'][1].save(captcha_io, format='PNG')
+
+        await peer.send(
+            bytes(RegistrationConfirmationRequest(
+                base64.b64decode(packet.data['user']['public_key']),
+                sender=ServerAccount(),
+                recipient=User(**packet.data['user']),
+                captcha_image=base64.b64encode(
+                    captcha_io.getvalue()
+                ).decode() if self.captcha_enabled else None,
+                proof_of_work_params=self.peers[peer.address]['registration']['proof_of_work'].params_json if self.pow_alg_enabled else None
+            ))
+        )
     
     async def on_authorization(self, peer: Peer, packet: Authentication):
         authentication_data = packet.data
@@ -292,6 +419,8 @@ class Server:
                 self.events.on_authorization(peer, packet)
             elif packet.pId == Registration.pId:
                 self.events.on_registration(peer, packet)
+            elif packet.pId == RegistrationConfirmation.pId:
+                self.events.on_registration_confirmation(peer, packet)
             else:
                 self.logger.error("Received unknown packet from peer. (Before authorization)")
 
