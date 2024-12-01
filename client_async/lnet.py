@@ -1,6 +1,5 @@
 import sys
 import os
-from types import coroutine
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, project_root)
@@ -21,6 +20,7 @@ import hashlib
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 import traceback
+from types import coroutine
 
 from io import BytesIO
 from PIL import Image
