@@ -5,7 +5,7 @@ from lnet_types import *
 from shared.eventflags import EventFlags
 
 class FriendAccepted(Event):
-    pId   = 0x101
+    pId   = 0x102
     pName = 'FriendAccepted'
     flags = 0 + EventFlags.DISPOSABLE
 
@@ -28,7 +28,7 @@ class FriendAccepted(Event):
         )
 
 class Typing(Event):
-    pId   = 0x102
+    pId   = 0x103
     pName = 'Typing'
     flags = 0 + EventFlags.DISPOSABLE
 
@@ -51,7 +51,7 @@ class Typing(Event):
         )
 
 class GroupCreated(Event):
-    pId   = 0x103
+    pId   = 0x104
     pName = 'GroupCreated'
     flags = 0
 
@@ -77,7 +77,7 @@ class GroupCreated(Event):
         )
 
 class MsgCreated(Event):
-    pId   = 0x104
+    pId   = 0x105
     pName = 'MsgCreated'
     flags = 0
 

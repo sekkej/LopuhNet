@@ -13,10 +13,18 @@ class TransmissionRequest(Packet):
     pId = 0x001
     pName = 'TransmissionRequest'
 
-    def __init__(self, sender: User, event: 'Event'):
-        super().__init__(sender, event.recipient, {
-            'eid': event.eid,
-            'data': base64.b64encode(bytes(event)).decode()
+    def __init__(self,
+                 sender: User,
+                 recipient: User,
+                 event: 'Event' = None,
+                 eid: str = None,
+                 edata: str = None,
+                 data = None
+            ):
+        super().__init__(sender, ServerAccount(), {
+            'eid': eid or (event.eid if event else None),
+            'data': edata or (base64.b64encode(bytes(event)).decode() if event else None),
+            'recipient': recipient.__dict__
         })
     
     def __bytes__(self):
@@ -27,13 +35,24 @@ class TransmissionRequest(Packet):
         pId = int.from_bytes(data[:4], 'big')
         if pId != cls.pId:
             raise RuntimeError(f"Invalid packet id! Expected: {cls.pId}, got {pId}")
-        return super().from_bytes(data[4:])
+        extracted_data = Packet.from_bytes(data[4:]).data
+        return super().from_bytes(
+            data[4:],
+            eid=extracted_data['eid'],
+            edata=extracted_data['data']
+        )
 
 class TransmissionResult(Packet):
     pId = 0x002
     pName = 'TransmissionResult'
 
-    def __init__(self, recipient: User, event_id: str, result: bool):
+    def __init__(self,
+                 recipient: User,
+                 event_id: str = None, 
+                 result: bool = None, 
+                 sender: None = None,
+                 data = None
+            ):
         super().__init__(ServerAccount(), recipient, {
             'eid': event_id,
             'result': result

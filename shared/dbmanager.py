@@ -15,6 +15,8 @@ from shared.packets import SecurePacket # type: ignore
 
 import logging
 
+USERNAME_ALLOWED_CHARS = list('qwertyuiopasdfghjklzxcvbnm1234567890_.QWERTYUIOPASDFGHJKLZXCVBNM')
+
 class DatabaseException(BaseException):
     """
     Exception during the Database working
@@ -93,6 +95,10 @@ class Database:
             return False, DatabaseException("User's username is too short or too big.")
         if len(user.name) <= 1 or len(user.name) > 48:
             return False, DatabaseException("User's display name is too short or too big.")
+
+        for char in user.username:
+            if char not in USERNAME_ALLOWED_CHARS:
+                return False, DatabaseException("Username contains forbidden characters.")
         
         if user.avatar_seed < 0:
             return False, DatabaseException("Avatar seed cannot be a negative number.")

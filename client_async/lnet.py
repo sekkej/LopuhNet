@@ -372,7 +372,7 @@ class LNetAPI:
             account_data: AccountData = None,
             logger: logging.Logger = base_logger
         ):
-        """## Creates an instance of LNet API Wrapper
+        """## Create instance of LNet API Wrapper
 
         Args:
             server_host (str): server's hostname (e.g.: server's IP)
@@ -389,22 +389,27 @@ class LNetAPI:
         
         # Initialize events and logger
         self.events = Events((
-            # Low-level transport events
+            #~ Low-level transport events
             *(
                 'on_netmessage', 'on_event'
             ),
 
-            # Specifically API Client events
+            #~ Specifically API Client events
             *(
                 'on_start', 'on_registration_captcha', 'on_ready',
             ),
 
-            # Friend requests events
+            #~ Friend requests events
             *(
                 'on_friend_request', 'on_friend_request_accepted'
             ),
 
-            # Messages managing events
+            #~ Group events
+            *(
+                'on_group_created', 'on_group_deleted'
+            ),
+
+            #~ Messages managing events
             *(
                 'on_message', 'on_message_edit', 'on_message_delete',
             ),
@@ -424,6 +429,8 @@ class LNetAPI:
           - on_ready: calls after successful authorization and readiness to receive data.
           - on_friend_request: calls after receiving a friend request.
           - on_friend_request_accepted: calls after specific user accepted your friend request.
+          - on_group_created: calls after specific group just has been created.
+          - on_group_deleted: calls after specific group just has been deleted.
           - on_message: calls after receiving a message.
           - on_message_edit: calls after someone edited their message.
           - on_message_delete: calls after someone deleted their message.
@@ -482,15 +489,22 @@ class LNetAPI:
         self.event(self.on_netmessage)
 
     def event(self, func):
-        """Decorator for event-handling functions
+        """Decorator for event-handling functions.
 
         Args:
             func (function): a coroutine-like function
+        
+        Example:
+        ```
+        @client.event
+        async def on_ready():
+            client.logger.debug("Client is ready!")
+        ```
         """
         self.events.handler(func)
 
-    async def send(self, data: bytes):
-        """Send data to server
+    async def _send(self, data: bytes):
+        """Send bytes to server
 
         Args:
             data (bytes): data to send
@@ -519,7 +533,7 @@ class LNetAPI:
         return bytes(data)
 
     async def receive(self):
-        """Awaits data from server
+        """Await bytes from server.
 
         Returns:
             bytes: received data
@@ -528,13 +542,13 @@ class LNetAPI:
         return await self._receive(int.from_bytes(data_length, 'big'))
 
     async def close_connection(self):
-        """Closes connection with the server
+        """Close connection with the server.
         """
         self._writer.close()
         await self._writer.wait_closed()
 
     def _get_avatar_seed(self, seed: str) -> int:
-        """Returns avatar seed as an integer
+        """Return avatar seed as an integer.
 
         Args:
             seed (str): seed-phrase
@@ -545,7 +559,7 @@ class LNetAPI:
         return xxhash.xxh128(seed).intdigest() % (10 ** 10)
 
     async def authorize(self):
-        """Authorizes user.
+        """Authorize currently loaded user.
 
         Raises:
             RuntimeError: if have been authorized already.
@@ -566,7 +580,7 @@ class LNetAPI:
         if self.user is None:
             raise RuntimeError("No account found to authenticate!")
 
-        await self.send(
+        await self._send(
             bytes(Authentication(
                 self._pdsa,
                 self._server_public,
@@ -629,7 +643,7 @@ class LNetAPI:
         user = User(name, username, self._get_avatar_seed(avatar_seed), public_key_enc, public_signkey_enc)
 
         self.logger.debug("Sending Registration packet...")
-        await self.send(
+        await self._send(
             bytes(Registration(
                 self._pdsa,
                 self._server_public,
@@ -668,7 +682,7 @@ class LNetAPI:
             while self._captcha_solution is None:
                 await asyncio.sleep(.1)
         
-        await self.send(
+        await self._send(
             bytes(RegistrationConfirmation(
                 self._pdsa,
                 self._server_public,
@@ -708,7 +722,9 @@ class LNetAPI:
         self.logger.error(f"Considering server's response it's registration failure: {registration_result['message']}")
         return False, registration_result['message']
 
-    async def connect(self):
+    async def _connect(self):
+        """Open connection to LNet Server.
+        """
         self.logger.info(f"Connecting to {self.server_host}:{self.server_port}")
         # self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         # self._sock.connect((self.server_host, self.server_port))
@@ -718,8 +734,10 @@ class LNetAPI:
         self.logger.info("Connected to server")
 
     async def _fetch_server_key(self):
+        """Fetch LNet Server's individual key.
+        """
         self.logger.info(f"Requesting server's individual encryption key...")
-        await self.send(b'KEYEXCHANGE')
+        await self._send(b'KEYEXCHANGE')
         self._server_public = (await self.receive())[7:]
         self._server_sign_public = (await self.receive())[11:]
         self.logger.info("Saved server's personal one-time individual encryption key!")
@@ -740,7 +758,7 @@ class LNetAPI:
                 except Exception as e:
                     self.logger.warning(f"Error occured while reading auto-save file:\n{e}.\n If this happened meanwhile you were not registered, or if you were doing the registration process, then ignore this.")
 
-        await self.connect()
+        await self._connect()
         await self._fetch_server_key()
 
         self._running = True
@@ -749,6 +767,15 @@ class LNetAPI:
         await self._listen_netmessages()
 
     async def send_friend_request(self, username: str):
+        """Send friend request to the peer with given username.
+
+        Args:
+            username (str): peer with this username
+
+        Returns:
+            tuple[bool, str]: result, result message
+        """
+
         self.logger.debug(f'Sending a friend request to {username}...')
         
         ev = FriendRequest(
@@ -759,7 +786,7 @@ class LNetAPI:
             user=username
         )
         self._frequests[ev.eid] = None
-        await self.send(bytes(ev))
+        await self._send(bytes(ev))
 
         self.logger.debug('Waiting answer from server...')
         timeout = time.time() + 5
@@ -780,15 +807,37 @@ class LNetAPI:
         self._frequests.pop(ev.eid)
         return False, error_message
     
+    async def accept_friend_request(self, request_sender: User):
+        await self._on_friend_registry(request_sender)
+        server_response = await self._send_event(
+            events.FriendAccepted(
+                self._pdsa,
+                base64.b64decode(request_sender.public_key),
+                sender=self.user,
+                recipient=request_sender
+            )
+        )
+        return server_response
+    
     async def _send_event(self, ev: Event):
+        """Request event transmission via LNet Server.
+
+        Args:
+            ev (Event): event you need to transmit to someone
+
+        Returns:
+            tuple[bool, str]: result, result message
+        """
+
         self.logger.debug(f'Requesting a transmission of event (eid={ev.eid})...')
         
         transmission_packet = TransmissionRequest(
             sender=self.user,
+            recipient=ev.recipient,
             event=ev
         )
         self._transmission_results[ev.eid] = None
-        await self.send(bytes(transmission_packet))
+        await self._send(bytes(transmission_packet))
 
         self.logger.debug('Waiting answer from server...')
         timeout = time.time() + 5
@@ -833,12 +882,15 @@ class LNetAPI:
         # that means we can decrypt each packet as an Event
 
         epId = int.from_bytes(data[:4], 'big')
-        is_server_packet = epId in (FriendRequest.pId, FriendRequestResult.pId, TransmissionResult.pId)
-        event = Event.from_bytes(
-            data,
-            self._private_key,
-            self._server_sign_public if is_server_packet else None
-        )
+        if epId == TransmissionResult.pId:
+            event = TransmissionResult.from_bytes(data)
+        else:
+            is_server_packet = epId in (FriendRequest.pId, FriendRequestResult.pId)
+            event = Event.from_bytes(
+                data,
+                self._private_key,
+                self._server_sign_public if is_server_packet else None
+            )
         
         match event.pId:
             case FriendRequest.pId:
@@ -847,14 +899,53 @@ class LNetAPI:
                 self._frequests[event.data['request_eid']] = event.data['result']
             case TransmissionResult.pId:
                 self._transmission_results[event.data['request_eid']] = event.data['result']
+            case events.FriendAccepted.pId:
+                await self._on_friend_registry(event.sender)
+                self.events.on_friend_request_accepted(event.sender)
             case _:
                 self.logger.debug(event.data)
     
-    async def on_friend_registry(self, user: User):
-        self._friends[user.userid] = user
+    @property
+    def friends(self) -> list[User]:
+        """Retrieve User instances from the saved friend list.
+
+        Returns:
+            list[User]: list of User instances
+        """
+        return [User(**friend_data) for friend_data in self._friends.values()]
     
-    async def on_group_registry(self, group: types.Group):
+    @property
+    def groups(self) -> list[types.Group]:
+        """Retrieive Group instances from the saved group list.
+
+        Returns:
+            list[Group]: list of Group instances
+        """
+        return [types.Group(**group_data) for group_data in self._groups.values()]
+
+    async def _on_friend_registry(self, user: User):
+        self._friends[user.userid] = user
+        if self.autosaver:
+            await self.autosaver.add_friend(user)
+    
+    async def _on_friend_removal(self, userid: str):
+        if userid in self._friends:
+            self._friends.pop(userid)
+        
+        if self.autosaver:
+            await self.autosaver.remove_friend(userid)
+    
+    async def _on_group_registry(self, group: types.Group):
         self._groups[group.groupid] = group
+        if self.autosaver:
+            await self.autosaver.add_group(group)
+    
+    async def _on_group_removal(self, groupid: str):
+        if groupid in self._groups:
+            self._groups.pop(groupid)
+        
+        if self.autosaver:
+            await self.autosaver.remove_group(groupid)
 
     async def stop(self):
         """Stops the LNet Client

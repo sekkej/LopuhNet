@@ -98,22 +98,22 @@ class Server:
         
         # Initialize events
         self.events = Events((
-            # Raw data processor
+            #~ Raw data processor
             *(
                 'on_netmessage',
             ),
 
-            # Authentication processor
+            #~ Authentication processor
             *(
                 'on_registration', 'on_registration_confirmation', 'on_authorization'
             ),
 
-            # Friend requests
+            #~ Friend requests
             *(
                 'on_friend_request',
             ),
 
-            # Transmission requests
+            #~ Transmission requests
             *(
                 'on_transmission',
             ),
@@ -132,6 +132,7 @@ class Server:
         self.event(self.on_registration_confirmation)
         self.event(self.on_authorization)
         self.event(self.on_friend_request)
+        self.event(self.on_transmission)
 
     def event(self, func):
         self.events.handler(func)
@@ -372,28 +373,33 @@ class Server:
         )
     
     async def on_transmission(self, sender_peer: Peer, data: bytes):
-        self.logger.info("Peer sent friend request to another peer, proceeding...")
+        self.logger.info("Peer requested event transmission, proceeding...")
 
         sender_info = self.peers[sender_peer.address]
-        packet = Packet.from_bytes(data)
+        packet = TransmissionRequest.from_bytes(data)
         sender_user = sender_info['user']
+        requested_recipient = User(**packet.data['recipient'])
 
         for peerAddr, peerInfo in self.peers.items():
-            if peerInfo['user'].userid == packet.recipient.userid:
+            if peerInfo['user'].userid == requested_recipient.userid:
                 await peerInfo['peer'].send(
                     base64.b64decode(packet.data['data'])
                 )
-                await sender_peer.send(TransmissionResult(
-                    sender_user,
-                    packet.data['eid'],
-                    result=(True, 'Success!')
-                ))
+                await sender_peer.send(
+                    bytes(TransmissionResult(
+                        sender_user,
+                        packet.data['eid'],
+                        result=(True, 'Success!')
+                    ))
+                )
+                self.logger.info("Successfully transmitted event!")
                 return
         
+        self.logger.error("Peer tried to send friend request to offline or unknown peer!")
         await sender_peer.send(
             bytes(TransmissionResult(
                 sender_user,
-                event_id=packet.data['eid'],
+                packet.data['eid'],
                 result=(False, 'Recipient is unknown or offline!')
             ))
         )
