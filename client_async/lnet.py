@@ -370,7 +370,9 @@ class LNetAPI:
             database_path: str = 'lnet.db',
             autosaver: DataAutoSaver = None,
             account_data: AccountData = None,
-            logger: logging.Logger = base_logger
+            logger: logging.Logger = base_logger,
+            _max_seconds_packet_active: int = 60,
+            _max_nonce_list_size: int = 2048
         ):
         """## Create instance of LNet API Wrapper
 
@@ -473,6 +475,12 @@ class LNetAPI:
         """Configured `DataAutoSaver` instance"""
         # self.autosave_enabled = autosave_data
         # self.autosave_path = autosave_path
+
+        # Replay attack mitigation configuration
+        self._max_seconds_packet_active = _max_seconds_packet_active
+        self._max_nonce_list_size = _max_nonce_list_size
+        # Initialize latest nonces list (mitigation of Replay attack)
+        self.latest_nonces = []
 
         # Socket stuff
         self._running = False
@@ -886,11 +894,24 @@ class LNetAPI:
             event = TransmissionResult.from_bytes(data)
         else:
             is_server_packet = epId in (FriendRequest.pId, FriendRequestResult.pId)
-            event = Event.from_bytes(
+            event, nonce, timestamp = Event.from_bytes(
                 data,
                 self._private_key,
-                self._server_sign_public if is_server_packet else None
+                self._server_sign_public if is_server_packet else None,
+                return_nonce_and_timestamp=True
             )
+
+            if nonce in self.latest_nonces:
+                self.logger.error("Received `Event`, with known nonce. Might be a Replay attack.")
+                return
+            
+            if time.time() - timestamp > self._max_seconds_packet_active:
+                self.logger.error("Received `Event`, with too old timestamp. Might be a Replay attack.")
+                return
+            
+            if len(self.latest_nonces) > self._max_nonce_list_size:
+                self.latest_nonces.pop(0)
+            self.latest_nonces.append(nonce)
         
         match event.pId:
             case FriendRequest.pId:
@@ -898,7 +919,7 @@ class LNetAPI:
             case FriendRequestResult.pId:
                 self._frequests[event.data['request_eid']] = event.data['result']
             case TransmissionResult.pId:
-                self._transmission_results[event.data['request_eid']] = event.data['result']
+                self._transmission_results[event.data['eid']] = event.data['result']
             case events.FriendAccepted.pId:
                 await self._on_friend_registry(event.sender)
                 self.events.on_friend_request_accepted(event.sender)

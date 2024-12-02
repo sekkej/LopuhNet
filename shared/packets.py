@@ -89,15 +89,19 @@ class SecurePacket(Packet):
             self.purpose_info
         )
 
+        nonce = base64.b64encode(encrypted[2])
+        timestamp = base64.b64encode(str(int(time.time())).encode())
+
         if self.pdsa is not None:
-            signature = base64.b64encode(self.pdsa.sign(encrypted[0])).decode()
+            signature = base64.b64encode(self.pdsa.sign(encrypted[0] + nonce + timestamp)).decode()
         else:
             signature = None
         
         return self.pId.to_bytes(4, 'big') + json.dumps({
             'encrypted': base64.b64encode(encrypted[0]).decode(),
             'ciphertext': base64.b64encode(encrypted[1]).decode(),
-            'nonce': base64.b64encode(encrypted[2]).decode(),
+            'nonce': nonce.decode(),
+            'timestamp': timestamp.decode(),
             'signature': signature
         }, ensure_ascii=False).encode()
 
@@ -107,19 +111,21 @@ class SecurePacket(Packet):
                     own_private_key: bytes,
                     purpose_info: bytes,
                     peer_sign_public: bytes = None,
-                    _verify_signature: bool = True,
+                    return_nonce_and_timestamp: bool = False,
+                    _verify_signature: bool = True
                 ):
         jsondata = json.loads(data[4:])
         pId = int.from_bytes(data[:4], 'big')
         encdata = base64.b64decode(jsondata['encrypted'])
         cipher_text = base64.b64decode(jsondata['ciphertext'])
         nonce = base64.b64decode(jsondata['nonce'])
+        timestamp = jsondata['timestamp'].encode()
         signed = jsondata['signature'] is not None
         if signed:
             signature = base64.b64decode(jsondata['signature'])
 
         if _verify_signature and signed and peer_sign_public is not None \
-             and not PacketDSA.verify(encdata, signature, peer_sign_public):
+             and not PacketDSA.verify(encdata + jsondata['nonce'].encode() + timestamp, signature, peer_sign_public):
             raise RuntimeError("PacketDSA SecurePacket verification failure.") # Must be catched.
         
         decrypted = super().from_bytes(brotli.decompress(
@@ -137,10 +143,12 @@ class SecurePacket(Packet):
 
         if _verify_signature and signed and peer_sign_public is None:
             peer_sign_public = base64.b64decode(decrypted.sender.public_signkey)
-            if not PacketDSA.verify(encdata, signature, peer_sign_public):
+            if not PacketDSA.verify(encdata + jsondata['nonce'].encode() + timestamp, signature, peer_sign_public):
                 raise RuntimeError("PacketDSA SecurePacket verification failure.") # Must be catched.
 
         decrypted.pId = pId
+        if return_nonce_and_timestamp:
+            return decrypted, nonce, int(base64.b64decode(timestamp).decode())
         return decrypted
 
 class Registration(SecurePacket):
@@ -319,6 +327,7 @@ class Event(SecurePacket):
                     data: bytes,
                     own_private_key: bytes,
                     peer_sign_public: bytes = None,
+                    return_nonce_and_timestamp: bool = False,
                     _verify_signature: bool = True
                 ):
         return super().from_bytes(
@@ -326,6 +335,7 @@ class Event(SecurePacket):
             own_private_key,
             b'lopuhnet-event',
             peer_sign_public,
+            return_nonce_and_timestamp,
             _verify_signature
         )
 

@@ -1,18 +1,40 @@
 {
     "Welcome to the basic LNet Server JSON configurator!":
     "Here you can properly configure your server based on your needs.",
+    "In specific options, null stands for infinity or undefined.": "e.g. option: `max_num_cached_events`",
+    "P.S. Please, do not remove any option, it will cause unexpected error.": "Do it only if you know what you're doing.",
 
     "host": "127.0.0.1",
     "port": 9229,
-    "max_num_cached_events": 16,
+
+    "max_num_cached_events_for_retrials": 16,
+    "Maximum number of events saved into running server's memory, reserved for the case if there will be":
+    "that one client or more, that had unexpected decryption error or signature verification failure.",
+
+    "max_num_cached_events_for_postponement": 4096,
+    "Maximum number of events saved into running server's memory, reserved for the case":
+    "if recepient of stated event(-s) is offline at the moment, so server will resend them later on.",
+
     "register_captcha_enabled": true,
     "register_captcha_number_of_digits": 4,
-    "register_pow_alg_enabled": true,
-    "register_pow_alg_difficulty": 5,
-    "register_pow_alg_exdifficulty": 2,
+    "Number of digits used in Captcha during registration confirmation.":"",
 
-    "All settings below considered as low-level.":
-    "Change them only if you know what are you doing!",
+    "register_pow_alg_enabled": true,
+    "Toggler of Proof-of-Work mechanism, a mitigation of a flooding attack, used during registration confirmation.":"",
+    "register_pow_alg_difficulty": 5,
+    "Proof-of-Work mechanism difficulty.": "(how many zeros at start of a hash(-es) must has(-ve))",
+    "register_pow_alg_exdifficulty": 2,
+    "Proof-of-Work mechanism extra-difficulty.": "(how many hashes in PoW must be)",
+
+
+
+    "ALL SETTINGS BELOW CONSIDERED AS LOW-LEVEL.":
+    "CHANGE THEM ONLY IF YOU KNOW WHAT ARE YOU DOING!",
+
+    "_max_seconds_packet_timestamp_active": 600,
+    "Maximum number of seconds of how long packet timestamp can be valid.":"",
+    "_max_nonce_list_size": 2048,
+    "Maximum number of saved nonces for last `_max_seconds_packet_timestamp_active` seconds.":"",
 
     "_register_captcha_difficulty": 2,
     "_register_pow_alg_salt_length": 32

@@ -8,6 +8,7 @@ import asyncio
 
 import json
 import base64
+import time
 
 from shared.asyncio_events import Events
 from shared.base_logger import logging, base_logger
@@ -81,7 +82,8 @@ class Server:
         self.host = config['host']
         self.port = config['port']
 
-        self.max_num_cached_events = config['max_num_cached_events']
+        self.max_num_cached_events_retrials = config['max_num_cached_events_for_retrials']
+        self.max_num_cached_events_for_postponement = config['max_num_cached_events_for_postponement']
 
         self.captcha_enabled = config['register_captcha_enabled']
         self.captcha_digits_num = config['register_captcha_number_of_digits']
@@ -91,6 +93,9 @@ class Server:
         self.pow_alg_diff = config['register_pow_alg_difficulty']
         self.pow_alg_exdiff = config['register_pow_alg_exdifficulty']
         self.pow_alg_saltlen = config['_register_pow_alg_salt_length']
+
+        self.max_seconds_packet_active = config['_max_seconds_packet_timestamp_active']
+        self.max_nonce_list_size = config['_max_nonce_list_size']
         
         # Initialize database
         self.db = Database(logger)
@@ -126,6 +131,9 @@ class Server:
 
         # Initialize captcha manager
         self.captcha = CaptchaManager(self.captcha_digits_num, self.captcha_difficulty)
+
+        # Initialize latest nonces list (mitigation of Replay attack)
+        self.latest_nonces = []
 
         self.event(self.on_netmessage)
         self.event(self.on_registration)
@@ -415,11 +423,24 @@ class Server:
                 case TransmissionRequest.pId:
                     self.events.on_transmission(peer, data)
         else:
-            packet = SecurePacket.from_bytes(
+            packet, nonce, timestamp = SecurePacket.from_bytes(
                 data,
                 peer_info['exclusive_keys']['private'],
-                b'lopuhnet-auth'
+                b'lopuhnet-auth',
+                return_nonce_and_timestamp=True
             )
+
+            if nonce in self.latest_nonces:
+                self.logger.error("Peer tried to send, or resend a SecurePacket, with known nonce. Might be a Replay attack.")
+                return
+            
+            if time.time() - timestamp > self.max_seconds_packet_active:
+                self.logger.error("Peer tried to send, or resend a SecurePacket, with too old timestamp. Might be a Replay attack.")
+                return
+            
+            if len(self.latest_nonces) > self.max_nonce_list_size:
+                self.latest_nonces.pop(0)
+            self.latest_nonces.append(nonce)
 
             if packet.pId == Authentication.pId:
                 self.events.on_authorization(peer, packet)
