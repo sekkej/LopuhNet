@@ -8,7 +8,7 @@ autosaver = DataAutoSaver("Unit1's very secret password", autosave_path='client_
 client = LNetAPI(
     # '193.124.115.81', 9229,
     '127.0.0.1', 9229,
-    'client_async/lnet.db',
+    'client_async/lnet_sekkej.db',
     autosaver=autosaver,
 )
 
@@ -25,18 +25,21 @@ async def on_start():
 async def on_ready():
     client.logger.debug("Client is ready!")
     peterpavel = client.friends[0]
-    await client._send_event(
-        events.MsgCreated(
-            client._pdsa,
-            base64.b64decode(peterpavel.public_key),
-            sender=client.user,
-            recipient=peterpavel
-        )
-    )
+    await client.send_message(types.Message(
+        client.user,
+        peterpavel.userid,
+        f"Hi there, {peterpavel.name}!",
+        timestamp=None
+    ))
+
     # client.logger.debug(client.friends)
     # client.logger.info(client._friends)
     # client.logger.info(client.user.public_key)
     # client.logger.info(autosaver._data)
+
+@client.event
+async def on_message(msg: types.Message):
+    client.logger.debug(f"{msg.author.name}: {msg.content}")
 
 @client.event
 async def on_friend_request(user: types.User):

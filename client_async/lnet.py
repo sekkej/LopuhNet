@@ -21,9 +21,14 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 import traceback
 from types import coroutine
+from typing import Optional, Union
 
 from io import BytesIO
 from PIL import Image
+
+
+from lnet_events import *
+from lnet_types import *
 
 class AccountData:
     """
@@ -274,6 +279,12 @@ class DataAutoSaver:
         self.__consumer_task = None
         self._data = None
     
+    async def encrypt_event(self, event_bytes: bytes):
+        return await self.encrypt_AES(event_bytes)
+    
+    async def decrypt_event(self, event_bytes: bytes):
+        return await self.decrypt_AES(event_bytes)
+
     async def read_file(self):
         encdata = json.load(open(self.path, encoding='utf-8'))
         self._salt = base64.b64decode(encdata['salt'])
@@ -393,7 +404,7 @@ class LNetAPI:
         self.events = Events((
             #~ Low-level transport events
             *(
-                'on_netmessage', 'on_event'
+                'on_netmessage', 'on_netevent'
             ),
 
             #~ Specifically API Client events
@@ -495,6 +506,7 @@ class LNetAPI:
 
         # Initialize on_netmessage event
         self.event(self.on_netmessage)
+        self.event(self.on_netevent)
 
     def event(self, func):
         """Decorator for event-handling functions.
@@ -744,7 +756,7 @@ class LNetAPI:
     async def _fetch_server_key(self):
         """Fetch LNet Server's individual key.
         """
-        self.logger.info(f"Requesting server's individual encryption key...")
+        self.logger.debug(f"Requesting server's individual encryption key...")
         await self._send(b'KEYEXCHANGE')
         self._server_public = (await self.receive())[7:]
         self._server_sign_public = (await self.receive())[11:]
@@ -859,12 +871,64 @@ class LNetAPI:
         if self._transmission_results[ev.eid][0] == True:
             self.logger.debug('Transmission succeed.')
             self._transmission_results.pop(ev.eid)
+            if EventFlags.DISPOSABLE.name not in EventFlags.get_flags(ev.flags):
+                encrypted_event = await self.autosaver.encrypt_event(bytes(ev))
+                self._database.add_event(time.time(), ev.recipient.userid, encrypted_event, ev.eid)
             return True, 'Success!'
         
         error_message = self._transmission_results[ev.eid][1]
         self.logger.error(f'Transmission request failure: {error_message}.')
         self._transmission_results.pop(ev.eid)
         return False, error_message
+
+    async def send_message(self, message: types.Message) -> Union[bool, tuple[bool, str]]:
+        """Send message to channel.
+
+        Dev-note: message timestamps beyond this client's side.
+        It means recipient(-s) will automatically handle the timestamp parameter.
+        As a result, you can ignore timestamp field while sending the message.
+
+        Args:
+            message (Message): message you want send to
+
+        Returns:
+        - if sent in DM:
+            result (tuple[True, ''] | tuple[False, str]): true if success, otherwise false and error message
+        - if sent in Group
+            result (tuple[True, '', accepted_users] | tuple[False, str]): true if success, otherwise false; error message; users that received message successfully
+        """
+        
+        if not self.authorized:
+            raise RuntimeError("Unauthorized.")
+
+        if not message.author == self.user:
+            raise RuntimeError("Message author does not equal to client's account user. Not authorized properly or fake message.")
+
+        if len(message.content) > 4000:
+            raise RuntimeError("Message content is too large!")
+        
+        if len(message.content) == 0 and len(message.pictures) == 0:
+            raise RuntimeError("Message must have content or attached pictures in it.")
+        
+        if message.channel in self._friends:
+            recipient = await self.fetch_user(message.channel)
+            # self._check_peer_status(recipient)
+            result = await self._send_event(
+                ev = events.MsgCreated(
+                    self._pdsa,
+                    base64.b64decode(recipient.public_key),
+                    sender=self.user,
+                    recipient=recipient,
+                    message=message
+                )
+            )
+            if result[0] == True:
+                self.events.on_message(message)
+        
+        else:
+            raise RuntimeError("Message channel is invalid. Note that message channel must be an ID of a group or a person (DM).")
+        
+        return result
 
     async def _listen_netmessages(self):
         while not self.authorized:
@@ -924,8 +988,34 @@ class LNetAPI:
                 await self._on_friend_registry(event.sender)
                 self.events.on_friend_request_accepted(event.sender)
             case _:
-                self.logger.debug(event.data)
+                self.events.on_netevent(data, event)
     
+    async def on_netevent(self, original_data: bytes, event: Event):
+        match event.pId:
+            case events.MsgCreated.pId:
+                msg = types.Message(**event.data['message'])
+                msg.author = User(**msg.author)
+                if not msg.author == event.sender:
+                    self.logger.warning("Peer sent MsgCreated with insufficient permissions.")
+                    return
+                
+                msg.timestamp = time.time()
+                msg.content = msg.content[:4000]
+                if len(msg.content) == 0 and len(msg.pictures) == 0:
+                    self.logger.warning("Peer sent empty Message in MsgCreated.")
+                    return
+                
+                pics = msg.pictures.copy()
+                msg.pictures.clear()
+                for pic in pics:
+                    msg.pictures.append(types.Picture(**pic))
+                
+                self._database.add_event(time.time_ns(), event.recipient.userid, original_data, event.eid)
+                self.events.on_message(msg)
+            case _:
+                # self.logger.debug(event.data)
+                self.logger.error("Received Event with unknown pId. Skipping...")
+
     @property
     def friends(self) -> list[User]:
         """Retrieve User instances from the saved friend list.
@@ -935,6 +1025,49 @@ class LNetAPI:
         """
         return [User(**friend_data) for friend_data in self._friends.values()]
     
+    async def fetch_user(self, userid: str = None, username: str = None) -> Optional[User]:
+        """Fetch specific User by given parameters. (from friend list)
+
+        Args:
+            userid (str, optional)
+            username (str, optional)
+
+        Returns:
+            Optional[User]: fetched User or None
+        """
+        if userid:
+            return User(**self._friends[userid])
+        
+        for user in self._friends.values():
+            if user['username'] == username:
+                return User(**user)
+        
+        return None
+    
+    async def fetch_group(self, groupid: str = None, group_name: str = None) -> Optional[types.Group]:
+        """Fetch specific Group by given parameters.
+
+        Args:
+            groupid (str, optional)
+            groupname (str, optional)
+
+        Returns:
+            Optional[Group]: fetched Group or None
+        """
+
+        if groupid:
+            group = types.Group(**self._groups[groupid])
+            group.members = [User(**m) for m in group.members]
+            return group
+        
+        for group in self._groups.values():
+            if group['name'] == group_name:
+                group = types.Group(**group)
+                group.members = [User(**m) for m in group.members]
+                return group
+        
+        return None
+
     @property
     def groups(self) -> list[types.Group]:
         """Retrieive Group instances from the saved group list.
