@@ -7,7 +7,6 @@ import base64
 
 autosaver = DataAutoSaver("Unit1's very secret password", autosave_path='account_data_peterpavel.json')
 client = LNetAPI(
-    # '193.124.115.81', 9229,
     '127.0.0.1', 9229,
     'lnet_peterpavel.db',
     autosaver=autosaver,
