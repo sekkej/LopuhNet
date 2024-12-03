@@ -1,6 +1,9 @@
 # 🍀 LopuhNet
 **LNet (LopuhNet)** — is a secure **P2P** (peer-to-peer) messenger, with an emphasis on **privacy**. In general, it uses **post-quantum key encapsulation mechanism** which has **NIST confirmed** recently and the [**ChaCha20Poly1305 cipher**](https://en.wikipedia.org/wiki/ChaCha20-Poly1305).
 
+> [!IMPORTANT]
+> Currently, LNet is under development and cannot be used on a mass scale.
+
 It uses **TURN Server** to transmit **events**[^1] between *two or more* peers. It supports **DMs and Groups too**. It uses **TCP** and all packets are being encrypted with **ML-KEM** and signed with **ML-DSA** and both are [confirmed by **NIST**.](https://www.nist.gov/news-events/news/2024/08/nist-releases-first-3-finalized-post-quantum-encryption-standards)
 
 LNet uses [**SQLite**](https://www.sqlite.org/), but as the database management code located in `/shared/dbmanager.py`, that means you can rewrite it to use any other database management system.
