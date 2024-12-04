@@ -5,7 +5,7 @@ from PIL import Image
 
 import base64
 
-autosaver = DataAutoSaver("Unit1's very secret password", autosave_path='account_data_peterpavel.json')
+autosaver = DataAutoSaver("Unit2's very secret password", autosave_path='account_data_peterpavel.json')
 client = LNetAPI(
     '127.0.0.1', 9229,
     'lnet_peterpavel.db',
@@ -14,6 +14,11 @@ client = LNetAPI(
 
 @client.event
 async def on_start():
+    # await client.register(
+    #     'Mr. President',
+    #     'peterpavel',
+    #     'peterpavel'
+    # )
     await client.authorize()
 
 @client.event
@@ -28,6 +33,7 @@ async def on_message(msg: types.Message):
 @client.event
 async def on_friend_request(user: types.User):
     client.logger.debug(f"friend request from: {user.username}")
+    await client.accept_friend_request(user)
 
 @client.event
 async def on_friend_request_accepted(user: types.User):

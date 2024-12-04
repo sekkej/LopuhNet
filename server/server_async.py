@@ -415,7 +415,6 @@ class Server:
     async def on_netmessage(self, peer: Peer, data: bytes):
         peer_info = self.peers[peer.address]
         if peer_info['authorized']:
-            # TODO: Implement status check.
             packet_id = int.from_bytes(data[:4], 'big')
             match packet_id:
                 case FriendRequest.pId:
