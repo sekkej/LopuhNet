@@ -478,10 +478,11 @@ class Server:
         try:
             await self.on_connection(peer)
         except Exception as e:
-            self.logger.error(f"Internal error while processing new connection:\n{traceback.format_exc()}")
+            self.logger.error(f"Internal error while processing new connection ({peer.address}):\n{traceback.format_exc()}")
             await peer.close_connection()
             if peer.address in self.peers:
                 self.peers.pop(peer.address)
+            return
         
         self.logger.debug("Listening peer...")
         

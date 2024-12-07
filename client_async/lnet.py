@@ -953,7 +953,7 @@ class LNetAPI:
                     continue
                 self.events.on_netmessage(data)
             except Exception as e:
-                self.logger.error(f"Error in listening loop: {e}")
+                self.logger.fatal(f"Error in listening loop: {e}")
                 break
     
     async def on_netmessage(self, data: bytes):
@@ -1118,4 +1118,9 @@ class LNetAPI:
     def start(self):
         """Starts the LNet Client
         """
-        asyncio.run(self._run())
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(self._run())
+        except Exception as e:
+            traceback.print_exc()
+            asyncio.run(self._run())

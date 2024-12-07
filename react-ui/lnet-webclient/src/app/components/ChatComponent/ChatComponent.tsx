@@ -5,11 +5,23 @@ import React, { useState, useEffect } from 'react';
 import { Message } from '../Message/Message';
 import { EditMessageBox } from '../EditMessageBox/EditMessageBox';
 
-export const ChatComponent = () => {
+interface ChatComponentProps {
+  chatId: string | null;
+  selfUserId: string | null;
+}
+
+export const ChatComponent = ({ chatId, selfUserId }: ChatComponentProps) => {
   const [messages, setMessages] = useState([]);
 
   useEffect(() => {
+    if (!chatId) return;
+
     const handleNewMessage = (event) => {
+      const msgSenderUId = event.detail[0].author.userid;
+      if (msgSenderUId !== chatId && msgSenderUId !== selfUserId) {
+        return;
+      }
+
       const newMessage = {
         content: event.detail[0].content,
         sender: event.detail[0].author.username,
@@ -24,7 +36,7 @@ export const ChatComponent = () => {
     return () => {
       window.removeEventListener('on_message', handleNewMessage);
     };
-  }, []);
+  }, [chatId]);
 
   return (
     <div>
@@ -41,7 +53,7 @@ export const ChatComponent = () => {
           </div>
         ))}
       </div>
-      <EditMessageBox />
+      <EditMessageBox chatId={chatId} />
     </div>
   );
 };

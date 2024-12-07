@@ -43,7 +43,7 @@ python3.10 server/server_async.py
 ```
 ### If server is running successfully, without any error or an unexpected stop, you can try to connect to your server via the client.
 
-# 💻 How to use the client?
+# 💻 How to use the client-side API wrapper?
 LNet provides basic **asynchronous API wrapper** for *vanilla* server, that you can use any way you want. With that, you're able to create **your own user-interface of LNet client** or even **develop bots**.
 1. Install [**Python 3.10**](https://www.python.org/downloads/release/python-3100/) or above, if you haven't yet.
 ```bash
@@ -110,8 +110,11 @@ LopuhNet
 │   ├── lnet.py        # API Wrapper of asynchronous LNet Client
 │   ├── lnet_events.py # Events like MsgCreated, MsgDeleted, etc.
 │   ├── lnet_types.py  # Types like Message, User, etc.
+│   ├── wsbridge.py    # Basic WebSockets bridge in case you need to use this wrapper in different project.
 │   ├── config.json    # Configuration file for the client
 │   └── example.py     # Example usage of API Wrapper
+├── react-ui
+│   └── ... # Contains code of LNet Client user interface on React
 ├── shared
 │   ├── asyncio_events.py # Proper asynchronous events system
 │   ├── base_logger.py    # Default logger instance

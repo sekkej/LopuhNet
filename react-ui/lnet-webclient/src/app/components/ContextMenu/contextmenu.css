@@ -29,6 +29,7 @@
     transition: 0.2s;
 }
 
+@media (hover: hover) {
 .context-menu-option:hover {
     background-color: var(--accent);
-}
+}}

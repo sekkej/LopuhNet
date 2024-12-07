@@ -1,5 +1,5 @@
-import '../../globals.css'
-import './contextmenu.css'
+import '../../globals.css';
+import './contextmenu.css';
 import React, { useState, forwardRef, useEffect } from 'react';
 
 interface ContextMenuProps {
@@ -13,9 +13,17 @@ export const ContextMenu = forwardRef<HTMLDivElement, ContextMenuProps>(({ posit
     const [visible, setVisible] = useState(false);
 
     useEffect(() => {
+        if (position) {
+            setVisible(true);
+        } else {
+            setVisible(false);
+        }
+    }, [position]);
+
+    useEffect(() => {
       const handleContextMenu = (event: MouseEvent) => {
         event.preventDefault();
-        onClose()
+        onClose();
       };
 
       document.addEventListener('contextmenu', handleContextMenu);
@@ -25,14 +33,6 @@ export const ContextMenu = forwardRef<HTMLDivElement, ContextMenuProps>(({ posit
       };
     }, [onClose]);
 
-    useEffect(() => {
-        if (position) {
-            setVisible(true);
-        } else {
-            setVisible(false);
-        }
-    }, [position]);
-
     if (!position) return null;
 
     let context_menu_items = (
@@ -40,7 +40,7 @@ export const ContextMenu = forwardRef<HTMLDivElement, ContextMenuProps>(({ posit
           <div className="context-menu-option">Copy</div>
           <div className="context-menu-option">Reply</div>
         </div>
-    )
+    );
     if (isOwnMessage) {
         context_menu_items = (
             <div className="context-menu-options">
@@ -49,7 +49,7 @@ export const ContextMenu = forwardRef<HTMLDivElement, ContextMenuProps>(({ posit
                 <div className="context-menu-option">Copy</div>
                 <div className="context-menu-option">Reply</div>
             </div>
-        )
+        );
     }
 
     return (

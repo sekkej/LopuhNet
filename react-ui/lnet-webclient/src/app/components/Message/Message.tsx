@@ -11,7 +11,7 @@ interface MessageProps {
   isOwn?: boolean;
   prevSender: string | null;
 }
-  
+
 export const Message = ({ content, sender, timestamp, isOwn = false, prevSender }: MessageProps) => {
     const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number } | null>(null);
     const contextMenuRef = useRef<HTMLDivElement>(null);
