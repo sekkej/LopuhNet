@@ -48,9 +48,15 @@
     transition: background-color 0.2s;
 }
 
+.channel-item.selected {
+    background-color: var(--primary);
+    color: var(--text);
+}
+
+@media (hover: hover) {
 .channel-item:hover {
     background-color: var(--primary-dark);
-}
+}}
 
 /* Profile section styles */
 .profile-section {

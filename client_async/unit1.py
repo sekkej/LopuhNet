@@ -1,6 +1,7 @@
 import json
 import base64
 import asyncio
+import time
 from lnet import LNetAPI, DataAutoSaver, AccountData, events, types
 from PIL import Image
 
@@ -14,22 +15,25 @@ client = LNetAPI(
 @client.event
 async def on_start():
     # await client.register(
-    #     'Mr. President',
-    #     'peterpavel',
-    #     'paterpavel'
+    #     'sekkej',
+    #     'sekkej',
+    #     'sekkej'
     # )
     await client.authorize()
 
 @client.event
 async def on_ready():
     client.logger.debug("Client is ready!")
+    # await client.send_friend_request("peterpavel")
     peterpavel = client.friends[0]
+    st = time.time()
     await client.send_message(types.Message(
         client.user,
         peterpavel.userid,
         f"Hi there, {peterpavel.name}!",
         timestamp=None
     ))
+    client.logger.debug(f"{time.time() - st}")
 
     # client.logger.debug(client.friends)
     # client.logger.info(client._friends)

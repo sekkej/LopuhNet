@@ -5,7 +5,11 @@ import './editmessagebox.css'
 import { sendAction } from '../../wsbridge';
 import React, { useEffect, useRef, useState } from 'react';
 
-export const EditMessageBox = () => {
+interface EditMessageBoxProps {
+  chatId: string | null;
+}
+
+export const EditMessageBox = ({ chatId }: EditMessageBoxProps) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [messageText, setMessageText] = useState('');
 
@@ -32,15 +36,14 @@ export const EditMessageBox = () => {
 
   const handleKeyDown = async (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'Enter') {
-      event.preventDefault(); // Prevent new line on Enter key press
+      event.preventDefault();
 
-      if (messageText.trim()) {
-        // Send the message
-        const userId = (await sendAction('fetch_user', { username: 'jameswarren' }))[1].userid;
-        await sendAction('send_message', { channel: userId, content: messageText });
+      if (messageText.trim() && chatId) {
+        const result = await sendAction('send_message', { channel: chatId, content: messageText });
 
-        // Clear the input field
-        setMessageText('');
+        if (result[0]) {
+          setMessageText('');
+        }
       }
     }
   };

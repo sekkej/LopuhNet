@@ -1,6 +1,7 @@
 import WebSocket from 'isomorphic-ws';
 
 export const ws = new WebSocket('ws://localhost:8765');
+let isWSActive = false;
 
 ws.onmessage = (event) => {
   const data = JSON.parse(event.data);
@@ -28,12 +29,30 @@ export async function sendAction(action, data) {
 }
 
 export async function initializeWebSocket() {
+  console.log('Attempting to establish WebSocket connection...');
   await new Promise((resolve) => {
-    ws.onopen = resolve;
-  });
-
+    setTimeout(() => {
+      if (isWSActive) {
+        resolve();
+      }
+    }, 100)
+  })
   console.log('WebSocket connection established');
-  console.log(await sendAction('authorize', { trusted_consts_path: 'D:/DOCS/LopuhNet-GitHub/LopuhNet/client/trusted_consts.json', cached_data_path: 'D:/DOCS/LopuhNet-GitHub/LopuhNet/client/cached_data_sekkej.json', database_filename: 'D:/DOCS/LopuhNet-GitHub/LopuhNet/client/lnet_sekkej' }));
+  return true;
+}
+
+export async function authorize(password, autosave_path, database_path) {
+  return await sendAction('authorize',
+    {
+      password: password,
+      autosave_path: autosave_path,
+      database_path: database_path
+    }
+  );
+}
+
+ws.onopen = () => {
+  isWSActive = true;
 }
 
 ws.onclose = () => {

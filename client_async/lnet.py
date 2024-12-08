@@ -279,6 +279,13 @@ class DataAutoSaver:
         self.__consumer_task = None
         self._data = None
     
+    async def verify_password(self):
+        try:
+            await self.read_file()
+            return True
+        except:
+            return False
+
     async def encrypt_event(self, event_bytes: bytes):
         return await self.encrypt_AES(event_bytes)
     
@@ -286,9 +293,12 @@ class DataAutoSaver:
         return await self.decrypt_AES(event_bytes)
 
     async def read_file(self):
-        encdata = json.load(open(self.path, encoding='utf-8'))
-        self._salt = base64.b64decode(encdata['salt'])
-        return json.loads((await self._decryptor(base64.b64decode(encdata['encrypted']))).decode())
+        try:
+            encdata = json.load(open(self.path, encoding='utf-8'))
+            self._salt = base64.b64decode(encdata['salt'])
+            return json.loads((await self._decryptor(base64.b64decode(encdata['encrypted']))).decode())
+        except:
+            raise RuntimeError("Invalid password.")
     
     async def write_file(self):
         encrypted = await self._encryptor(json.dumps(self._data, ensure_ascii=False).encode())
@@ -778,7 +788,11 @@ class LNetAPI:
                 except Exception as e:
                     self.logger.warning(f"Error occured while reading auto-save file:\n{e}.\n If this happened meanwhile you were not registered, or if you were doing the registration process, then ignore this.")
 
-        await self._connect()
+        try:
+            await self._connect()
+        except:
+            self.logger.error(f"Error occurred while opening connection to the server:\n{traceback.format_exc()}")
+            return
         await self._fetch_server_key()
 
         self._running = True
@@ -946,7 +960,7 @@ class LNetAPI:
                     continue
                 self.events.on_netmessage(data)
             except Exception as e:
-                self.logger.error(f"Error in listening loop: {e}")
+                self.logger.fatal(f"Error in listening loop: {e}")
                 break
     
     async def on_netmessage(self, data: bytes):
@@ -1111,4 +1125,9 @@ class LNetAPI:
     def start(self):
         """Starts the LNet Client
         """
-        asyncio.run(self._run())
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(self._run())
+        except Exception as e:
+            traceback.print_exc()
+            asyncio.run(self._run())

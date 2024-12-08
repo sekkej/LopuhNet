@@ -415,7 +415,6 @@ class Server:
     async def on_netmessage(self, peer: Peer, data: bytes):
         peer_info = self.peers[peer.address]
         if peer_info['authorized']:
-            # TODO: Implement status check.
             packet_id = int.from_bytes(data[:4], 'big')
             match packet_id:
                 case FriendRequest.pId:
@@ -479,10 +478,11 @@ class Server:
         try:
             await self.on_connection(peer)
         except Exception as e:
-            self.logger.error(f"Internal error while processing new connection:\n{traceback.format_exc()}")
+            self.logger.error(f"Internal error while processing new connection ({peer.address}):\n{traceback.format_exc()}")
             await peer.close_connection()
             if peer.address in self.peers:
                 self.peers.pop(peer.address)
+            return
         
         self.logger.debug("Listening peer...")
         

@@ -167,3 +167,6 @@ client_async/*.json
 # Databases
 client_async/*.db
 server/*.db
+
+# Experimental area
+.lnetexp
