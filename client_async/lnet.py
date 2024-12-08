@@ -279,6 +279,13 @@ class DataAutoSaver:
         self.__consumer_task = None
         self._data = None
     
+    async def verify_password(self):
+        try:
+            await self.read_file()
+            return True
+        except:
+            return False
+
     async def encrypt_event(self, event_bytes: bytes):
         return await self.encrypt_AES(event_bytes)
     

@@ -19,6 +19,8 @@ class LNetBridge:
         await self.ws.send(json.dumps({'event': 'on_message', 'args': [message.__dict__]}))
 
     async def handle_client(self, websocket: websockets.WebSocketServerProtocol, path: str):
+        if self.ws:
+            await self.ws.close()
         self.ws = websocket
         print("Handling the client...")
 
@@ -30,9 +32,14 @@ class LNetBridge:
             match action:
                 case "authorize":
                     autosaver = DataAutoSaver(data['password'], autosave_path=data['autosave_path'])
+                    valid_password = await autosaver.verify_password()
+                    if not valid_password:
+                        await self.ws.send(json.dumps({'result': (False, 'Invalid password'), 'id': aid}))
+                        continue
+
                     self.lnet = LNetAPI(
                         '127.0.0.1', 9229,
-                        'client_async/lnet_sekkej.db',
+                        data['database_path'],
                         autosaver=autosaver,
                     )
                     self.lnet.event(self.on_start)

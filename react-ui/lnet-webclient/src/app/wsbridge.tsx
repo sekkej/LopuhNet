@@ -37,11 +37,18 @@ export async function initializeWebSocket() {
       }
     }, 100)
   })
-
   console.log('WebSocket connection established');
-  console.log(await sendAction('authorize', {password: "Unit1's very secret password", autosave_path: 'D:/DOCS/LopuhNet-GitHub/LopuhNet/client_async/account_data_sekkej.json', database_path: 'D:/DOCS/LopuhNet-GitHub/LopuhNet/client/lnet_sekkej' }));
-
   return true;
+}
+
+export async function authorize(password, autosave_path, database_path) {
+  return await sendAction('authorize',
+    {
+      password: password,
+      autosave_path: autosave_path,
+      database_path: database_path
+    }
+  );
 }
 
 ws.onopen = () => {

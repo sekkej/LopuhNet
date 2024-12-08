@@ -17,16 +17,12 @@ export const ChatComponent = ({ chatId, selfUserId }: ChatComponentProps) => {
     if (!chatId) return;
 
     const handleNewMessage = (event) => {
-      const msgSenderUId = event.detail[0].author.userid;
-      if (msgSenderUId !== chatId && msgSenderUId !== selfUserId) {
-        return;
-      }
-
       const newMessage = {
         content: event.detail[0].content,
         sender: event.detail[0].author.username,
-        timestamp: new Date(event.detail[0].timestamp / 1e+6),
+        timestamp: new Date(event.detail[0].timestamp * 1000),
         isOwn: event.detail[0].author.username === "sekkej",
+        messageDetails: event.detail[0],
       };
       setMessages((prevMessages) => [...prevMessages, newMessage]);
     };
@@ -38,10 +34,16 @@ export const ChatComponent = ({ chatId, selfUserId }: ChatComponentProps) => {
     };
   }, [chatId]);
 
+  console.log(chatId);
   return (
     <div>
       <div className="chat">
-        {messages.map((message, index) => (
+        {messages.filter(
+          m => m.messageDetails.channel === chatId
+          ||
+          (m.messageDetails.channel === selfUserId && chatId === m.messageDetails.author.id)
+        )
+        .map((message, index) => (
           <div className="message-instance" key={index}>
             <Message
               content={message.content}
