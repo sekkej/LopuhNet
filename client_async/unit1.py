@@ -26,14 +26,14 @@ async def on_ready():
     client.logger.debug("Client is ready!")
     # await client.send_friend_request("peterpavel")
     peterpavel = client.friends[0]
-    st = time.time()
-    await client.send_message(types.Message(
-        client.user,
-        peterpavel.userid,
-        f"Hi there, {peterpavel.name}!",
-        timestamp=None
-    ))
-    client.logger.debug(f"{time.time() - st}")
+    # st = time.time()
+    # await client.send_message(types.Message(
+    #     client.user,
+    #     peterpavel.userid,
+    #     f"Hi there, {peterpavel.name}!",
+    #     timestamp=None
+    # ))
+    # client.logger.debug(f"{time.time() - st}")
 
     # client.logger.debug(client.friends)
     # client.logger.info(client._friends)

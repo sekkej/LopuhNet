@@ -35,18 +35,22 @@ export const EditMessageBox = ({ chatId }: EditMessageBoxProps) => {
   }, []);
 
   const handleKeyDown = async (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key === 'Enter') {
+    if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
-
+  
       if (messageText.trim() && chatId) {
         const result = await sendAction('send_message', { channel: chatId, content: messageText });
-
+  
         if (result[0]) {
           setMessageText('');
+          console.log("a");
+          const textarea = textareaRef.current;
+          textarea.style.height = 'auto';
         }
       }
     }
   };
+  
 
   return (
     <div className="edit-message-box">

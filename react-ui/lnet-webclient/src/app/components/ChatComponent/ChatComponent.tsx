@@ -1,9 +1,7 @@
-"use client"
-
-import './chatcomponent.css'
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Message } from '../Message/Message';
 import { EditMessageBox } from '../EditMessageBox/EditMessageBox';
+import './chatcomponent.css';
 
 interface ChatComponentProps {
   chatId: string | null;
@@ -12,6 +10,7 @@ interface ChatComponentProps {
 
 export const ChatComponent = ({ chatId, selfUserId }: ChatComponentProps) => {
   const [messages, setMessages] = useState([]);
+  const chatEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!chatId) return;
@@ -24,7 +23,15 @@ export const ChatComponent = ({ chatId, selfUserId }: ChatComponentProps) => {
         isOwn: event.detail[0].author.username === "sekkej",
         messageDetails: event.detail[0],
       };
-      setMessages((prevMessages) => [...prevMessages, newMessage]);
+
+      setMessages((prevMessages) => {
+        const updatedMessages = [...prevMessages, newMessage];
+        if (updatedMessages.length > 500) {
+          return updatedMessages.slice(1);
+        }
+        return updatedMessages;
+      });
+      // setMessages((prevMessages) => [...prevMessages, newMessage]);
     };
 
     window.addEventListener('on_message', handleNewMessage);
@@ -34,14 +41,19 @@ export const ChatComponent = ({ chatId, selfUserId }: ChatComponentProps) => {
     };
   }, [chatId]);
 
-  console.log(chatId);
+  useEffect(() => {
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages]);
+
   return (
     <div>
       <div className="chat">
         {messages.filter(
           m => m.messageDetails.channel === chatId
           ||
-          (m.messageDetails.channel === selfUserId && chatId === m.messageDetails.author.id)
+          (m.messageDetails.channel === selfUserId && chatId === m.messageDetails.author.userid)
         )
         .map((message, index) => (
           <div className="message-instance" key={index}>
@@ -54,6 +66,7 @@ export const ChatComponent = ({ chatId, selfUserId }: ChatComponentProps) => {
             />
           </div>
         ))}
+        <div ref={chatEndRef} />
       </div>
       <EditMessageBox chatId={chatId} />
     </div>

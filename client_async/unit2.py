@@ -24,14 +24,14 @@ async def on_start():
 @client.event
 async def on_ready():
     client.logger.debug("Client is ready!")
-    # fr = client.friends[0]
-    # while True:
-    #     await client.send_message(types.Message(
-    #         client.user,
-    #         fr.userid,
-    #         input(),
-    #         timestamp=None
-    #     ))
+    fr = client.friends[0]
+    while True:
+        await client.send_message(types.Message(
+            client.user,
+            fr.userid,
+            input(),
+            timestamp=None
+        ))
     client.logger.debug(f"sent")
     # await client.send_friend_request("sekkej")
 

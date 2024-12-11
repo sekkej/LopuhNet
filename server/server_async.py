@@ -474,6 +474,8 @@ class Server:
         self.logger.info('Successfully sent public key to newly connected peer!')
 
     async def handle_client(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
+        self.logger.debug("Handling new client...")
+
         peer = Peer(reader, writer)
         try:
             await self.on_connection(peer)

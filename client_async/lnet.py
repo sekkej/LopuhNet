@@ -26,7 +26,6 @@ from typing import Optional, Union
 from io import BytesIO
 from PIL import Image
 
-
 from lnet_events import *
 from lnet_types import *
 
@@ -887,7 +886,7 @@ class LNetAPI:
             self._transmission_results.pop(ev.eid)
             if EventFlags.DISPOSABLE.name not in EventFlags.get_flags(ev.flags):
                 encrypted_event = await self.autosaver.encrypt_event(bytes(ev))
-                self._database.add_event(time.time(), ev.recipient.userid, encrypted_event, ev.eid)
+                self._database.add_event(time.time_ns(), ev.recipient.userid, encrypted_event, ev.eid)
             return True, 'Success!'
         
         error_message = self._transmission_results[ev.eid][1]
@@ -1129,5 +1128,5 @@ class LNetAPI:
             loop = asyncio.get_running_loop()
             loop.create_task(self._run())
         except Exception as e:
-            traceback.print_exc()
+            # traceback.print_exc()
             asyncio.run(self._run())
