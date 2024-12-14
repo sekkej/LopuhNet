@@ -1,3 +1,7 @@
+img {
+    filter: invert(98%) sepia(0%) saturate(7474%) hue-rotate(240deg) brightness(124%) contrast(99%);
+}
+
 .context-menu {
     background-color: var(--back-medium);
     border: 1px solid var(--hints-dark);
@@ -5,6 +9,7 @@
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
     padding: 8px 0;
     z-index: 1;
+    width: fit-content;
     opacity: 0;
     transform: scale(0);
     transform-origin: top left;
@@ -23,6 +28,9 @@
 }
 
 .context-menu-option {
+    display: flex;
+    align-items: center;
+    line-height: 16px;
     font-size: 0.9rem;
     padding: 8px 16px;
     cursor: pointer;

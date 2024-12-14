@@ -3,7 +3,7 @@ import './sidebar.css'
 import React, { useState } from 'react';
 
 interface SidebarProps {
-  username: string;
+  username: string | null;
   chats: { id: string; name: string }[];
   onUserClick: (userId: string) => void;
 }
@@ -40,8 +40,8 @@ export const Sidebar = ({ username, chats, onUserClick }: SidebarProps) => {
             {/* TODO: Add an avatar image here */}
           </div>
           <div className="profile-info">
-            <span className="profile-name">{username}</span>
-            <span className="unselectable profile-status">Online</span>
+            <span className="profile-name">{username || "Not logged in"}</span>
+            <span className="unselectable profile-status">{username ? "Online" : ""}</span>
           </div>
         </div>
       </div>

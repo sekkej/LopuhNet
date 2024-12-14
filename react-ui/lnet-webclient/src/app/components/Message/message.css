@@ -3,7 +3,7 @@
     margin: 8px 0;
     border-radius: 16px 16px 16px 1px;
     width: fit-content;
-    max-width: 90%;
+    max-width: 33%;
     margin-right: auto;
 }
 
@@ -36,7 +36,7 @@
 
 .message-content {
     font-size: 0.9rem;
-    white-space: pre-wrap; /* This will preserve whitespace and allow line wrapping */
+    white-space: pre-wrap;
     word-wrap: break-word;
 }
 
@@ -49,4 +49,8 @@
             display: none;
         }
     }
+}
+
+.pending-message {
+    background-color: var(--hints);
 }

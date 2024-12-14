@@ -68,6 +68,8 @@ class Peer:
             bytes: data
         """
         data_length = await self._reader.read(4) # Read data length
+        if len(data_length) != 4:
+            raise RuntimeError("Malformed data length packet. Perhaps connection just closed.")
         return await self._receive(int.from_bytes(data_length, 'big'))
     
     async def close_connection(self):
@@ -479,8 +481,8 @@ class Server:
         peer = Peer(reader, writer)
         try:
             await self.on_connection(peer)
-        except Exception as e:
-            self.logger.error(f"Internal error while processing new connection ({peer.address}):\n{traceback.format_exc()}")
+        except (OSError, RuntimeError) as e:
+            self.logger.error(f"Closing connection due to internal error occurred while processing new connection ({peer.address}):\n{traceback.format_exc()}")
             await peer.close_connection()
             if peer.address in self.peers:
                 self.peers.pop(peer.address)
@@ -491,8 +493,8 @@ class Server:
         while True:
             try:
                 data = await peer.receive()
-            except OSError as e:
-                self.logger.info(f"Closing peer's connection due to an expected error: {e.strerror}")
+            except (OSError, RuntimeError) as e:
+                self.logger.info(f"Closing peer's connection due to following error:\n{traceback.format_exc()}")
                 if peer.address in self.peers:
                     self.peers.pop(peer.address)
                 break

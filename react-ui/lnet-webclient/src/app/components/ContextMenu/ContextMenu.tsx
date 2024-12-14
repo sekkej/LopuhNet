@@ -37,17 +37,35 @@ export const ContextMenu = forwardRef<HTMLDivElement, ContextMenuProps>(({ posit
 
     let context_menu_items = (
         <div className="context-menu-options">
-          <div className="context-menu-option">Copy</div>
-          <div className="context-menu-option">Reply</div>
+          <div className="context-menu-option">
+            <img src="/copy-alt.svg" style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+            Copy
+          </div>
+          <div className="context-menu-option">
+            <img src="/redo.svg" style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+            Reply
+          </div>
         </div>
     );
     if (isOwnMessage) {
         context_menu_items = (
             <div className="context-menu-options">
-                <div className="context-menu-option">Edit Message</div>
-                <div className="context-menu-option">Delete Message</div>
-                <div className="context-menu-option">Copy</div>
-                <div className="context-menu-option">Reply</div>
+                <div className="context-menu-option">
+                  <img src="/copy-alt.svg" style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+                  Copy
+                </div>
+                <div className="context-menu-option">
+                  <img src="/redo.svg" style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+                  Reply
+                </div>
+                <div className="context-menu-option">
+                  <img src="/pencil.svg" style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+                  Edit Message
+                </div>
+                <div className="context-menu-option">
+                  <img src="/trash.svg" style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+                  Delete Message
+                </div>
             </div>
         );
     }

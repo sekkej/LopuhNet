@@ -72,7 +72,7 @@ class LNetBridge:
                         timestamp=time.time()
                     )
                     result = await self.lnet.send_message(message)
-                    await self.ws.send(json.dumps({'result': result, 'id': aid}))
+                    await self.ws.send(json.dumps({'result': (*result, message.__dict__), 'id': aid}))
                 
                 case "get_self_user":
                     await self.ws.send(json.dumps({'result': self.lnet.user.__dict__, 'id': aid}))
@@ -84,7 +84,7 @@ class LNetBridge:
 
     async def start(self):
         self.server = await websockets.serve(self.handle_client, "localhost", 8765)
-        print("Websockets server started on ws://localhost:8765")
+        print("Websockets bridge started on ws://localhost:8765")
 
     @classmethod
     async def run_with_timeout(cls, timeout=60):

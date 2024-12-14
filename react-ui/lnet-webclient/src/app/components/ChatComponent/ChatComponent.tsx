@@ -5,10 +5,10 @@ import './chatcomponent.css';
 
 interface ChatComponentProps {
   chatId: string | null;
-  selfUserId: string | null;
+  selfUser: object | null;
 }
 
-export const ChatComponent = ({ chatId, selfUserId }: ChatComponentProps) => {
+export const ChatComponent = ({ chatId, selfUser }: ChatComponentProps) => {
   const [messages, setMessages] = useState([]);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -20,8 +20,9 @@ export const ChatComponent = ({ chatId, selfUserId }: ChatComponentProps) => {
         content: event.detail[0].content,
         sender: event.detail[0].author.username,
         timestamp: new Date(event.detail[0].timestamp * 1000),
-        isOwn: event.detail[0].author.username === "sekkej",
+        isOwn: event.detail[0].author.username === selfUser?.username,
         messageDetails: event.detail[0],
+        pending: false
       };
 
       setMessages((prevMessages) => {
@@ -31,7 +32,6 @@ export const ChatComponent = ({ chatId, selfUserId }: ChatComponentProps) => {
         }
         return updatedMessages;
       });
-      // setMessages((prevMessages) => [...prevMessages, newMessage]);
     };
 
     window.addEventListener('on_message', handleNewMessage);
@@ -47,13 +47,19 @@ export const ChatComponent = ({ chatId, selfUserId }: ChatComponentProps) => {
     }
   }, [messages]);
 
+  console.log(messages[messages.length - 2]);
+
   return (
     <div>
       <div className="chat">
         {messages.filter(
-          m => m.messageDetails.channel === chatId
-          ||
-          (m.messageDetails.channel === selfUserId && chatId === m.messageDetails.author.userid)
+          m => (m.pending && m.onlyAccessibleIn === chatId)
+              ||
+          (
+            m.messageDetails?.channel === chatId
+                          ||
+            (m.messageDetails?.channel === selfUser?.userid && chatId === m.messageDetails?.author.userid)
+          )
         )
         .map((message, index) => (
           <div className="message-instance" key={index}>
@@ -63,12 +69,13 @@ export const ChatComponent = ({ chatId, selfUserId }: ChatComponentProps) => {
               timestamp={message.timestamp}
               isOwn={message.isOwn}
               prevSender={index > 0 ? messages[index - 1].sender : null}
+              pending={message.pending}
             />
           </div>
         ))}
         <div ref={chatEndRef} />
       </div>
-      <EditMessageBox chatId={chatId} />
+      <EditMessageBox chatId={chatId} selfUser={selfUser} setMessages={setMessages} />
     </div>
   );
 };
