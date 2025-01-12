@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from 'react';
-import { ChatComponent } from './components/ChatComponent/ChatComponent';
+import { WorkspaceComponent } from './components/WorkspaceComponent/WorkspaceComponent';
 import { Sidebar } from './components/Sidebar/Sidebar';
 import { AuthComponent } from './components/AuthComponent/AuthComponent';
 import { initializeWebSocket, sendAction } from './wsbridge';
@@ -44,7 +44,7 @@ export default function Main() {
       <Sidebar username={currentSelfUser?.username} chats={chats} onUserClick={handleUserClick} />
       <main className={isAuthorized ? "main-content" : "main-content main-centered"}>
         {!isAuthorized && <AuthComponent onSuccess={() => setIsAuthorized(true)} />}
-        {isAuthorized && <ChatComponent chatId={selectedChatId} selfUser={currentSelfUser} />}
+        {isAuthorized && <WorkspaceComponent chatId={selectedChatId} selfUser={currentSelfUser} />}
       </main>
     </>
   );

@@ -28,8 +28,12 @@
     border: 1px solid var(--primary);
 }
 
-.auth-component input:focus{
+.auth-component input:focus {
     outline: none;
+}
+
+.auth-component input::placeholder {
+    color: var(--hints);
 }
 
 .auth-component button {

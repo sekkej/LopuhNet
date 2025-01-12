@@ -18,6 +18,9 @@ export const Message = ({ content, sender, timestamp, isOwn = false, prevSender,
     const contextMenuRef = useRef<HTMLDivElement>(null);
   
     const handleContextMenu = (event: React.MouseEvent<HTMLDivElement>) => {
+      if ((event.target.classList + event.target.parentElement.classList).includes("context")) {
+        return;
+      }
       event.preventDefault();
       setContextMenuPosition({ x: event.clientX, y: event.clientY });
     };

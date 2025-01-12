@@ -26,10 +26,19 @@ export const ContextMenu = forwardRef<HTMLDivElement, ContextMenuProps>(({ posit
         onClose();
       };
 
+      const handleRightClickInsideMenu = (event: MouseEvent) => {
+        if (ref.current && ref.current.contains(event.target as Node)) {
+          event.preventDefault();
+          onClose();
+        }
+      };
+
       document.addEventListener('contextmenu', handleContextMenu);
+      document.addEventListener('contextmenu', handleRightClickInsideMenu);
 
       return () => {
         document.removeEventListener('contextmenu', handleContextMenu);
+        document.removeEventListener('contextmenu', handleRightClickInsideMenu);
       };
     }, [onClose]);
 

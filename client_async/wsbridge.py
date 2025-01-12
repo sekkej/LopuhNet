@@ -20,6 +20,8 @@ class LNetBridge:
 
     async def handle_client(self, websocket: websockets.WebSocketServerProtocol, path: str):
         if self.ws:
+            if self.lnet:
+                await self.lnet.stop()
             await self.ws.close()
         self.ws = websocket
         print("Handling the client...")
@@ -47,6 +49,10 @@ class LNetBridge:
                     self.lnet.__auth_aid = aid
                     self.lnet.start()
                 
+                case "send_friend_request":
+                    result = await self.lnet.send_friend_request(data["username"])
+                    await self.ws.send(json.dumps({'result': result, 'id': aid}))
+
                 case "fetch_user":
                     if "username" in data:
                         result = await self.lnet.fetch_user(username=data["username"])

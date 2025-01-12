@@ -44,6 +44,7 @@
     --back-medium: #232523;
     --back-light: #252825;
     --back-bright: #282B28;
+    --primary-back: #2d312d;
     --primary-dark: #363d36;
     --primary: #7C9A73;
     --primary-blocked: #92AD89;
@@ -69,7 +70,7 @@ body {
   font-family: 'Open Sans', Arial, Helvetica, sans-serif;
 }
 
-.unselectable {
+img, .unselectable {
   -webkit-user-select: none; /* Safari */        
   -moz-user-select: none; /* Firefox */
   -ms-user-select: none; /* IE10+/Edge */

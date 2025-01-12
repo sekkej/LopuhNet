@@ -1,4 +1,9 @@
-img {
+.context-menu-option img {
+    filter: invert(98%) sepia(0%) saturate(7474%) hue-rotate(240deg) brightness(124%) contrast(99%);
+    transition: none;
+}
+
+.context-menu-option:hover img {
     filter: invert(98%) sepia(0%) saturate(7474%) hue-rotate(240deg) brightness(124%) contrast(99%);
 }
 
