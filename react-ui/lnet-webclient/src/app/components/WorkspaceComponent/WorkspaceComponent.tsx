@@ -12,13 +12,14 @@ interface WorkspaceComponentProps {
 }
 
 export const WorkspaceComponent = ({ chatId, selfUser }: WorkspaceComponentProps) => {
+  const [username, setUsername] = useState('');
+  const [resultMessage, setResultMessage] = useState('');
   const [friendsList, setFriendsList] = useState([]);
   const [messages, setMessages] = useState([]);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const fetchFriendsList = async () => {
-      try {
+    async function updateFriendsList() {
         const result = await sendAction('list_friends', {});
         // // TODO: REMOVE AFTER DEBUGGING
         // for (let i = 0; i < 64; i++) {
@@ -32,12 +33,17 @@ export const WorkspaceComponent = ({ chatId, selfUser }: WorkspaceComponentProps
         //   })
         // }
         setFriendsList(result);
-      } catch (error) {
-        console.error('Error fetching friends list:', error);
-      }
     };
 
-    fetchFriendsList();
+    updateFriendsList();
+
+    window.addEventListener('on_friend_request_accepted', updateFriendsList);
+    window.addEventListener('on_friend_removed', updateFriendsList);
+
+    return () => {
+      window.removeEventListener('on_friend_request_accepted', updateFriendsList);
+      window.removeEventListener('on_friend_removed', updateFriendsList);
+    };
   }, []);
 
   useEffect(() => {
@@ -69,12 +75,6 @@ export const WorkspaceComponent = ({ chatId, selfUser }: WorkspaceComponentProps
     };
   }, [chatId]);
 
-  useEffect(() => {
-    if (chatEndRef.current) {
-      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [messages]);
-
   if (chatId == null) {
     return (
       <div>
@@ -88,20 +88,58 @@ export const WorkspaceComponent = ({ chatId, selfUser }: WorkspaceComponentProps
   }
 
   if (chatId === "friendsTab") {
+    const sendFriendRequest = async () => {
+      if (!username) return;
+    
+      try {
+        const result = await sendAction('send_friend_request', { username });
+        setResultMessage(result[1]);
+        setUsername('');
+      } catch (error) {
+        setResultMessage(`Failed to send friend request: ${error.message}`);
+      }
+    };
+
+    const removeFriend = async (friendId) => {
+      try {
+        const result = await sendAction('remove_friend', { userid: friendId });
+        if (!result[0]) {
+          setResultMessage(`Failed to remove friend: ${result[1]}`);
+        }
+        setFriendsList(friendsList.filter(friend => friend.userid !== friendId));
+      } catch (error) {
+        setResultMessage(`Failed to remove friend: ${error.message}`);
+      }
+    };
+
     return (
       <div>
         <div className="chat main-centered">
           <div className="friends-management-panel">
             <div className="add-friend-panel">
-              <input type="text" placeholder="You can add friends with their username."></input>
-              <button className="add-friend-button unselectable">Send friend request</button>
+              <div className="friend-panel-inputs">
+                <input
+                  type="text"
+                  placeholder="You can add friends with their username."
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                />
+                <button onClick={sendFriendRequest} className="add-friend-button unselectable">Send friend request</button>
+              </div>
+              <div className="friend-panel-output">
+                <p className="friend-panel-result-message">{resultMessage}</p>
+              </div>
             </div>
             <div className={`friends-list unselectable ${friendsList.length > 0 ? '' : "empty-friends-list"}`}>
               {friendsList.length > 0 ? (
                 friendsList.map((friend) => (
                   <div key={friend.userid} className="friends-list-element">
                     {friend.name}
-                    <img src="/remove-friend.svg" style={{ width: '18px', height: '18px', marginRight: '8px' }} />
+                    <img
+                      src="/remove-friend.svg"
+                      style={{ width: '18px', height: '18px', marginRight: '8px' }}
+                      onClick={() => removeFriend(friend.userid)}
+                    />
                   </div>
                 ))
               ) : (
@@ -114,26 +152,27 @@ export const WorkspaceComponent = ({ chatId, selfUser }: WorkspaceComponentProps
     );
   }
 
+  const filteredMessages = messages.filter(
+    m => (m.pending && m.onlyAccessibleIn === chatId)
+        ||
+    (
+      m.messageDetails?.channel === chatId
+                    ||
+      (m.messageDetails?.channel === selfUser?.userid && chatId === m.messageDetails?.author.userid)
+    )
+  );
+
   return (
     <div>
       <div className="chat">
-        {messages.filter(
-          m => (m.pending && m.onlyAccessibleIn === chatId)
-              ||
-          (
-            m.messageDetails?.channel === chatId
-                          ||
-            (m.messageDetails?.channel === selfUser?.userid && chatId === m.messageDetails?.author.userid)
-          )
-        )
-        .map((message, index) => (
+        {filteredMessages.map((message, index) => (
           <div className="message-instance" key={index}>
             <Message
               content={message.content}
               sender={message.sender}
               timestamp={message.timestamp}
               isOwn={message.isOwn}
-              prevSender={index > 0 ? messages[index - 1].sender : null}
+              prevSender={index > 0 ? filteredMessages[index - 1].sender : null}
               pending={message.pending}
             />
           </div>

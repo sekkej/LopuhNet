@@ -423,7 +423,7 @@ class LNetAPI:
 
             #~ Friend requests events
             *(
-                'on_friend_request', 'on_friend_request_accepted'
+                'on_friend_request', 'on_friend_request_accepted', 'on_friend_removed'
             ),
 
             #~ Group events
@@ -446,16 +446,17 @@ class LNetAPI:
         ```
 
         Breakdown of available useful events:
-          - on_start (required): calls when client starts; in this event you must register or authorize via server.
-          - on_registration_captcha (required): if server is configured so, it requires from you to solve a captcha, you have to handle this event.
-          - on_ready: calls after successful authorization and readiness to receive data.
-          - on_friend_request: calls after receiving a friend request.
-          - on_friend_request_accepted: calls after specific user accepted your friend request.
-          - on_group_created: calls after specific group just has been created.
-          - on_group_deleted: calls after specific group just has been deleted.
-          - on_message: calls after receiving a message.
-          - on_message_edit: calls after someone edited their message.
-          - on_message_delete: calls after someone deleted their message.
+          - on_start (required): when client starts; in this event you must register or authorize via server.
+          - on_registration_captcha (required): if server is configured so, it requires from you to solve a captcha, so you have to handle this event.
+          - on_ready: after successful authorization and readiness to receive data.
+          - on_friend_request: after receiving a friend request.
+          - on_friend_request_accepted: after someone accepted your friend request.
+          - on_friend_removed: after friend has been removed from your friend list.
+          - on_group_created: after a group was made.
+          - on_group_deleted: after a group has been deleted.
+          - on_message: after receiving a message.
+          - on_message_edit: after someone edited their message.
+          - on_message_delete: after someone deleted their message.
         """
         self.logger = logger
         """LNet Client logger"""
@@ -833,7 +834,7 @@ class LNetAPI:
         if self._frequests[ev.eid][0] == True:
             self.logger.debug('Friend request sent.')
             self._frequests.pop(ev.eid)
-            return True, 'Success!'
+            return True, 'Friend request sent successfully!'
         
         error_message = self._frequests[ev.eid][1]
         self.logger.error(f'Friend request failure: {error_message}.')
@@ -851,6 +852,10 @@ class LNetAPI:
             )
         )
         return server_response
+    
+    async def remove_friend(self, userid: str):
+        await self._on_friend_removal(userid)
+        return True, 'Removed friend successfully.'
     
     async def _send_event(self, ev: Event):
         """Request event transmission via LNet Server.
@@ -999,7 +1004,6 @@ class LNetAPI:
                 self._transmission_results[event.data['eid']] = event.data['result']
             case events.FriendAccepted.pId:
                 await self._on_friend_registry(event.sender)
-                self.events.on_friend_request_accepted(event.sender)
             case _:
                 self.events.on_netevent(data, event)
     
@@ -1094,13 +1098,20 @@ class LNetAPI:
         self._friends[user.userid] = user
         if self.autosaver:
             await self.autosaver.add_friend(user)
+        
+        self.events.on_friend_request_accepted(user)
     
     async def _on_friend_removal(self, userid: str):
+        friend = None
         if userid in self._friends:
+            friend = User(**self._friends[userid])
             self._friends.pop(userid)
         
         if self.autosaver:
             await self.autosaver.remove_friend(userid)
+        
+        if friend:
+            self.events.on_friend_removed(friend)
     
     async def _on_group_registry(self, group: types.Group):
         self._groups[group.groupid] = group

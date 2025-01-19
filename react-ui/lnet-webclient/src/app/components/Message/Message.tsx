@@ -50,7 +50,10 @@ export const Message = ({ content, sender, timestamp, isOwn = false, prevSender,
         document.removeEventListener('keydown', handleEscapeKey);
       };
     }, []);
-  
+    
+    console.log(prevSender);
+    console.log(sender);
+
     return (
       <div
         className={`

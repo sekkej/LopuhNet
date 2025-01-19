@@ -27,13 +27,29 @@ export default function Main() {
     }
 
     async function fetchFriends() {
-      const friend_list = await sendAction('list_friends', {});
-      const chats = friend_list.map(user => ({ id: user.userid, name: user.name }));
+      const recvFriendsList = await sendAction('list_friends', {});
+      const chats = recvFriendsList.map(user => ({ id: user.userid, name: user.name }));
       setChats(chats);
     }
 
     initialize();
   }, [isAuthorized]);
+
+  useEffect(() => {
+    async function updateFriendList() {
+      const recvFriendsList = await sendAction('list_friends', {});
+      const chats = recvFriendsList.map(user => ({ id: user.userid, name: user.name }));
+      setChats(chats);
+    }
+
+    window.addEventListener('on_friend_request_accepted', updateFriendList);
+    window.addEventListener('on_friend_removed', updateFriendList);
+
+    return () => {
+      window.removeEventListener('on_friend_request_accepted', updateFriendList);
+      window.removeEventListener('on_friend_removed', updateFriendList);
+    };
+  }, []);
 
   const handleUserClick = (userId: string) => {
     setSelectedChatId(userId);
