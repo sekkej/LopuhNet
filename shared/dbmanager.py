@@ -4,16 +4,19 @@ import os
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, project_root)
 
+import logging
+# import sqlite3 as sql  # ~ Deprecated. Replaced with sqlcipher3
+from sqlcipher3 import dbapi2 as sql
+
 import time
-import bcrypt
+import json
 import base64
 import xxhash
-import sqlite3 as sql
+# import hashlib
+# from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
-from shared.basic_types import User # type: ignore
-from shared.packets import SecurePacket # type: ignore
-
-import logging
+from shared.basic_types import User
+from shared.packets import Event
 
 USERNAME_ALLOWED_CHARS = list('qwertyuiopasdfghjklzxcvbnm1234567890_.QWERTYUIOPASDFGHJKLZXCVBNM')
 
@@ -28,21 +31,24 @@ class DatabaseException(BaseException):
         super().__init__(message, *args)
 
 class Database:
-    def __init__(self, logger: logging.Logger, path='lnet.db'):
+    def __init__(self, logger: logging.Logger, password: str,  path='lnet.db'):
         self.logger = logger
 
         self.con = sql.connect(path, check_same_thread=False)
         self.cur = self.con.cursor()
+        self.cur.execute(f"PRAGMA key='{password}'")
+        self.cur.execute("PRAGMA cipher_compatibility = 3")
 
         tables = self.cur.execute("SELECT name FROM sqlite_master")
+        
         # If database hasn't been created yet before
         if tables.fetchone() is None:
             self.logger.info("Database hasn't been created yet before, so creating one...")
 
-            self.cur.execute("CREATE TABLE events(time, recipient_id, jPacket, eid)")
+            self.cur.execute("CREATE TABLE events(time, recipient_id, data, eid)")
             self.cur.execute("CREATE INDEX idx_events_time ON events(time)")
 
-            self.cur.execute("CREATE TABLE users(time, name, username, avatarSeed, publicKey, publicSignKey, uid)")
+            self.cur.execute("CREATE TABLE users(time, name, username, avatarSeed, publicKey, publicSignKey, privateKey, privateSignKey, uid)")
             self.cur.execute("CREATE INDEX idx_users_time ON users(time)")
 
             self.con.commit()
@@ -80,6 +86,7 @@ class Database:
         
         if fdbuser is None:
             return None
+        
         return User.from_db(fdbuser)
 
     def register(self, user: User, time=time.time()):
@@ -103,23 +110,30 @@ class Database:
         if user.avatar_seed < 0:
             return False, DatabaseException("Avatar seed cannot be a negative number.")
 
-        self.cur.execute(f"INSERT INTO users VALUES ({time}, '{user.name}', '{user.username}', {user.avatar_seed}, '{user.public_key}', '{user.public_signkey}', '{user.userid}')")
+        self.cur.execute(f"INSERT INTO users VALUES ({time}, '{user.name}', '{user.username}', {user.avatar_seed}, '{user.public_key}', '{user.public_signkey}', '{user.private_key}', '{user.private_signkey}', '{user.userid}')")
         self.con.commit()
 
         self.logger.info("Registration gone successfully!")
         return True
     
-    def add_event(self, t: int, recipient_id: str, secure_packet: bytes, eid: str = None):
-        b64packet = base64.b64encode(secure_packet).decode()
+    def remove_user(self, userid: str):
+        if not self.fetch_user(userid=userid):
+            return False, DatabaseException("User not found.")
+        
+        self.cur.execute(f"DELETE FROM users WHERE uid = '{userid}';")
+        self.con.commit()
 
+        return True
+
+    def add_event(self, t: int, recipient_id: str, event: Event, eid: str = None):
         if eid is None:
             eid = xxhash.xxh128(f'{time.time_ns()}').hexdigest()
         else:
             packet_exists = self.cur.execute(f"SELECT * FROM events WHERE eid='{eid}';").fetchone()
             if packet_exists is not None:
                 raise DatabaseException(f'Event with id {eid} have already been registered in Database.')
-
-        self.cur.execute(f"INSERT INTO events VALUES ({t}, '{recipient_id}', '{b64packet}', '{eid}')")
+        
+        self.cur.execute(f"INSERT INTO events VALUES ({t}, '{recipient_id}', ?, '{eid}')", (event._json,))
         self.con.commit()
 
         self.logger.debug('Added new event.')
@@ -175,24 +189,42 @@ class Database:
         self.logger.debug(f'Removed event at index: {index}.')
         return True
     
-    def get_checksum(self):
-        self.cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
-        tables = self.cur.fetchall()
-
-        dbvalue = b''
-        for table in tables:
-            table_name = table[0]
-            
-            # Get all rows from the table
-            self.cur.execute(f"SELECT * FROM {table_name}")
-            rows = self.cur.fetchall()
-
-            # Update the hash with table name and row data
-            dbvalue += table_name.encode('utf-8')
-            for row in rows:
-                dbvalue += str(row).encode('utf-8')
+    def get_client_account(self) -> User|None:
+        """Retrieve User instance of client-side account.
+        Note: do NOT send the client-side account User after retrieving it, it will compromise your private keys!
         
-        return xxhash.xxh128(dbvalue).hexdigest()
+        Returns:
+            User | None: User instance of self account
+        """
+        user = self.cur.execute(f"SELECT * FROM users WHERE privateKey != '';").fetchone()
+        return User.from_db(user) if user else None
+    
+    def get_client_friends(self) -> list[User]:
+        """Retrieve friends User instances of client-side account.
+        
+        Returns:
+            list[User]: User instances
+        """
+        return [User.from_db(u) for u in self.cur.execute(f"SELECT * FROM users WHERE privateKey == '';").fetchall()]
+
+    # def get_checksum(self):
+    #     self.cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
+    #     tables = self.cur.fetchall()
+
+    #     dbvalue = b''
+    #     for table in tables:
+    #         table_name = table[0]
+            
+    #         # Get all rows from the table
+    #         self.cur.execute(f"SELECT * FROM {table_name}")
+    #         rows = self.cur.fetchall()
+
+    #         # Update the hash with table name and row data
+    #         dbvalue += table_name.encode('utf-8')
+    #         for row in rows:
+    #             dbvalue += str(row).encode('utf-8')
+        
+    #     return xxhash.xxh128(dbvalue).hexdigest()
 
 # import logging
 # from colorlog import ColoredFormatter
@@ -225,18 +257,15 @@ class Database:
 # logger.setLevel(logging.DEBUG)
 # logger.addHandler(handler)
 
-# # # DB Creation
-# db = Database(logger, 'client/lnet_sekkej')
-# print(len(db.get_50_events(['30257deb22225c80b1163ad2059f62ee', '3e845c5b2af45dd49ea505c1ec3692fa'], 0)))
+# # DB Creation
+# db = Database(logger, 'test', 'shared/temp.db')
 
-# # Registration
-# p = '$lemonhead3310S*'.encode()
-# password = base64.b64encode(
-#                 bcrypt.hashpw(p, bcrypt.gensalt(16))
-#             ).decode()
-# ip = base64.b64encode(bcrypt.hashpw(b'192.168.0.1', bcrypt.gensalt(10))).decode()
-# print(db.register(User('lnet uid 1', 'sekkej', 1488, password, ip)))
-# print(db.register(User('lnet uid 2', 'peterpavel', 1337, password, ip)))
+# Registration
+# print(db.register(User('lnet uid 1', 'sekkej', 1488, '1', '2', '3', '4')))
+# print(db.register(User('lnet uid 2', 'peterpavel', 1337, '1', '2')))
+
+# Retrieve self
+# print(db.get_client_account())
 
 # # Update user
 # db.update_user(User('lnet uid 1', 'sekkej', 1223, "JDJiJDE2JHROdmI2Nm50Nm5NdVlCbkVoM0ZnZHVJbm9xN0VzN0loOWVZNU9KQ29ZWk80Ni9yZWc4N20u", "JDJiJDEwJGZyaDFZQlI3ZUptb2wxTk5oV3M4bnUwRnoxT0tlRnhIYzdMNE5ubFcuNjFMcURYcGxVUmsu", 'ab163eb9d8b55a79b1e03ccaa7028c06'))

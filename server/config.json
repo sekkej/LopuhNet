@@ -26,7 +26,9 @@
     "register_pow_alg_exdifficulty": 2,
     "Proof-of-Work mechanism extra-difficulty.": "(how many hashes in PoW must be)",
 
+    "database_password": "JustDontTellAnyone",
 
+    
 
     "ALL SETTINGS BELOW CONSIDERED AS LOW-LEVEL.":
     "CHANGE THEM ONLY IF YOU KNOW WHAT ARE YOU DOING!",

@@ -2,30 +2,29 @@ import json
 import base64
 import asyncio
 import time
-from lnet import LNetAPI, DataAutoSaver, AccountData, events, types
+from lnet import LNetAPI, events, types
 from PIL import Image
 
-autosaver = DataAutoSaver("Unit1's very secret password", autosave_path='client_async/account_data_sekkej.json')
 client = LNetAPI(
     '127.0.0.1', 9229,
-    'client_async/lnet_sekkej.db',
-    autosaver=autosaver,
+    "unit1secretPassword",
+    'client_async/lnet.db',
 )
 
 @client.event
 async def on_start():
-    # await client.register(
-    #     'sekkej',
-    #     'sekkej',
-    #     'sekkej'
-    # )
-    await client.authorize()
+    await client.register(
+        'sekkej',
+        'sekkej',
+        'sekkej'
+    )
+    # await client.authorize()
 
 @client.event
 async def on_ready():
     client.logger.debug("Client is ready!")
     # await client.send_friend_request("peterpavel")
-    peterpavel = client.friends[0]
+    # peterpavel = client.friends[0]
     # st = time.time()
     # await client.send_message(types.Message(
     #     client.user,

@@ -14,7 +14,7 @@ export const AuthComponent = ({ onSuccess }: AuthComponentProps) => {
 
   const handleAuthorize = async () => {
     // ! Remove after debugging
-    setPassword("Unit1's very secret password")
+    setPassword("unit1secretPassword")
     try {
       const authResult = await authorize(password, 'D:/DOCS/LopuhNet-GitHub/LopuhNet/client_async/account_data.json', 'D:/DOCS/LopuhNet-GitHub/LopuhNet/client_async/lnet.db');
       if (authResult[0] === false) {

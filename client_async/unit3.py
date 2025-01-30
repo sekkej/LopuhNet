@@ -1,15 +1,14 @@
 import json
 import asyncio
-from lnet import LNetAPI, DataAutoSaver, AccountData, events, types
+from lnet import LNetAPI, events, types
 from PIL import Image
 
 import base64
 
-autosaver = DataAutoSaver("Unit3's very secret password", autosave_path='account_data_jameswarren.json')
 client = LNetAPI(
     '127.0.0.1', 9229,
+    "unit2secretPassword",
     'lnet_jameswarren.db',
-    autosaver=autosaver,
 )
 
 @client.event

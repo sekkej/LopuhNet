@@ -26,6 +26,8 @@ class User(JSI):
                 # attached_ip: str, Why do we need it?
                 public_key: str,
                 public_signkey: str,
+                private_key: str = '',
+                private_signkey: str = '',
                 userid: str = None
             ):
         self.name = name
@@ -46,10 +48,17 @@ class User(JSI):
         # """Hash of attached IP"""
 
         self.public_key = public_key
-        """Public key used for ciphering CHAKEMDSA"""
+        """Public key used to cipher"""
 
         self.public_signkey = public_signkey
-        """Public key used for signing CHAKEMDSA"""
+        """Public key used to sign"""
+
+        self.private_key = private_key
+        """Private key used to cipher"""
+
+        self.private_signkey = private_signkey
+        """Private key used to sign"""
+        
         # """Public key for verifying signature of PacketDNA"""
 
         self.userid = uuid5(

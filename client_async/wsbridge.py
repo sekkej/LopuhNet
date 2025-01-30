@@ -4,7 +4,7 @@ import time
 import base64
 from typing import Dict
 import websockets
-from lnet import LNetAPI, DataAutoSaver, AccountData, events, types
+from lnet import LNetAPI, events, types
 
 class LNetBridge:
     def __init__(self):
@@ -27,17 +27,17 @@ class LNetBridge:
     async def proceed_request(self, data: dict, action: str, aid):
         match action:
             case "authorize":
-                autosaver = DataAutoSaver(data['password'], autosave_path=data['autosave_path'])
-                valid_password = await autosaver.verify_password()
-                if not valid_password:
-                    await self.ws.send(json.dumps({'result': (False, 'Invalid password'), 'id': aid}))
+                try:
+                    self.lnet = LNetAPI(
+                        '127.0.0.1', 9229,
+                        data['password'],
+                        data['database_path'],
+                    )
+                except Exception as e:
+                    print(e)
+                    await self.ws.send(json.dumps({'result': (False, 'Incorrect password'), 'id': aid}))
                     return
-
-                self.lnet = LNetAPI(
-                    '127.0.0.1', 9229,
-                    data['database_path'],
-                    autosaver=autosaver,
-                )
+                
                 self.lnet.event(self.on_start)
                 self.lnet.event(self.on_message)
                 self.lnet.event(self.on_friend_request_accepted)

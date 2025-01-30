@@ -100,7 +100,7 @@ class Server:
         self.max_nonce_list_size = config['_max_nonce_list_size']
         
         # Initialize database
-        self.db = Database(logger)
+        self.db = Database(logger, config['database_password'])
         """Database instance"""
         
         # Initialize events
