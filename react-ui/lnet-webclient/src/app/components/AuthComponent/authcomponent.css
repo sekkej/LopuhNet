@@ -5,27 +5,29 @@
     margin-bottom: 16px;
     background-color: var(--back-bright);
     width: fit-content;
-    padding: 26px;
+    padding: 24px;
     border-radius: 6px;
     text-align: center;
 }
 
 .auth-component h1 {
-    font-size: x-large;
+    font-size: 24pt;
 }
 
 .auth-component h3 {
-    font-size: large;
+    font-size: 20pt;
     margin-bottom: 16px;
 }
 
 .auth-component input {
-    padding: 8px;
+    width: 90%;
+    padding: 6px;
     margin-bottom: 8px;
     border-radius: 4px;
     background-color: var(--back-light);
     color: var(--text);
     border: 1px solid var(--primary);
+    font-size: 12pt;
 }
 
 .auth-component input:focus {
@@ -37,6 +39,7 @@
 }
 
 .auth-component button {
+    margin-top: 8px;
     padding: 8px 16px;
     background-color: var(--primary);
     color: var(--text);

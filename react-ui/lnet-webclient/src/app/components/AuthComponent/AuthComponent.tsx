@@ -9,14 +9,18 @@ interface AuthComponentProps {
 }
 
 export const AuthComponent = ({ onSuccess }: AuthComponentProps) => {
+  const [address, setAddress] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
   const handleAuthorize = async () => {
     // ! Remove after debugging
-    setPassword("unit1secretPassword")
+    setAddress("127.0.0.1:9229");
+    setPassword("unit1secretPassword");
+
     try {
-      const authResult = await authorize(password, 'D:/DOCS/LopuhNet-GitHub/LopuhNet/client_async/account_data.json', 'D:/DOCS/LopuhNet-GitHub/LopuhNet/client_async/lnet.db');
+      const dbName = `${address.replace(':','#')}.db`;
+      const authResult = await authorize(address, password, dbName);
       if (authResult[0] === false) {
         setError(authResult[1]);
       }
@@ -30,8 +34,14 @@ export const AuthComponent = ({ onSuccess }: AuthComponentProps) => {
 
   return (
     <div className="auth-component">
-      <h1>Welcome to LNet</h1>
-      <h3>Authorization</h3>
+      <h1 className="unselectable">Welcome to LNet</h1>
+      <h3 className="unselectable">Authorization</h3>
+      <input
+        type="text"
+        placeholder="Server address (i.e. IP:Port)"
+        value={address}
+        onChange={(e) => setAddress(e.target.value)}
+      />
       <input
         type="password"
         placeholder="Enter your password"

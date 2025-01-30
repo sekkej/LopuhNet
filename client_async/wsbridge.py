@@ -1,15 +1,50 @@
-import asyncio
+import logging
+
 import json
 import time
 import base64
-from typing import Dict
+
+import asyncio
 import websockets
 from lnet import LNetAPI, events, types
+
+import os
+from appdirs import user_data_dir
 
 class LNetBridge:
     def __init__(self):
         self.lnet = None
         self.ws = None
+
+        self.appdir = user_data_dir('LNet')
+        if not os.path.exists(self.appdir):
+            os.makedirs(self.appdir)
+        
+        logging.basicConfig(
+            filename=self.appdir + '/latest.log',
+            filemode='w',
+            format=(
+                '%(asctime)s '
+                '%(levelname)-8s'
+                '%(message)s'
+            ),
+            datefmt='%Y-%m-%d %H:%M:%S'
+        )
+
+    # async def file_exists(self, rfilepath: str):
+    #     return os.path.exists(self.appdir + '/' + rfilepath)
+
+    # async def read_file(self, rfilepath: str, mode: str = 'r') -> str|bytes:
+    #     return open(self.appdir + '/' + rfilepath, mode=mode).read()
+    
+    # async def write_file(self, rfilepath: str, content: str | bytes):
+    #     mode = 'w' if isinstance(content, str) else 'wb'
+    #     with open(self.appdir + '/' + rfilepath, mode=mode) as f:
+    #         f.write(content)
+    #         f.close()
+
+    # async def delete_file(self, rfilepath: str):
+    #     os.remove(self.appdir + '/' + rfilepath)
 
     async def on_start(self):
         result = await self.lnet.authorize()
@@ -24,18 +59,20 @@ class LNetBridge:
     async def on_friend_removed(self, user: types.User):
         await self.ws.send(json.dumps({'event': 'on_friend_removed', 'args': [user.__dict__]}))
 
+    async def send_data(self, aid, result):
+        await self.ws.send(json.dumps({'result': result, 'id': aid}))
+
     async def proceed_request(self, data: dict, action: str, aid):
         match action:
             case "authorize":
                 try:
                     self.lnet = LNetAPI(
-                        '127.0.0.1', 9229,
+                        data['ip'], data['port'],
                         data['password'],
-                        data['database_path'],
+                        self.appdir + '/' + data['database_path'],
                     )
                 except Exception as e:
-                    print(e)
-                    await self.ws.send(json.dumps({'result': (False, 'Incorrect password'), 'id': aid}))
+                    await self.send_data(aid, (False, 'Incorrect password'))
                     return
                 
                 self.lnet.event(self.on_start)
@@ -47,11 +84,11 @@ class LNetBridge:
             
             case "send_friend_request":
                 result = await self.lnet.send_friend_request(data["username"])
-                await self.ws.send(json.dumps({'result': result, 'id': aid}))
+                await self.send_data(aid, result)
 
             case "remove_friend":
                 result = await self.lnet.remove_friend(data["userid"])
-                await self.ws.send(json.dumps({'result': result, 'id': aid}))
+                await self.send_data(aid, result)
 
             case "fetch_user":
                 if "username" in data:
@@ -66,7 +103,7 @@ class LNetBridge:
                 else:
                     result = (True, result.__dict__)
                 
-                await self.ws.send(json.dumps({'result': result, 'id': aid}))
+                await self.send_data(aid, result)
 
             case "send_message":
                 channel_id = data["channel"]
@@ -78,15 +115,15 @@ class LNetBridge:
                     timestamp=time.time()
                 )
                 result = await self.lnet.send_message(message)
-                await self.ws.send(json.dumps({'result': (*result, message.__dict__), 'id': aid}))
+                await self.send_data(aid, (*result, message.__dict__))
             
             case "get_self_user":
-                await self.ws.send(json.dumps({'result': self.lnet.user.__dict__, 'id': aid}))
+                await self.send_data(aid, self.lnet.user.__dict__)
 
             case "list_friends":
                 result = self.lnet.friends
                 sorted_az = sorted(result, key=lambda u: u.username)
-                await self.ws.send(json.dumps({'result': [u.__dict__ for u in sorted_az], 'id': aid}))
+                await self.send_data(aid, [u.__dict__ for u in sorted_az])
 
     async def handle_client(self, websocket: websockets.WebSocketServerProtocol, path: str):
         if self.ws:
@@ -94,7 +131,6 @@ class LNetBridge:
                 await self.lnet.stop()
             await self.ws.close()
         self.ws = websocket
-        print("Handling the client...")
 
         async for message in websocket:
             data = json.loads(message)

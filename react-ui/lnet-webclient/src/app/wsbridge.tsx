@@ -41,11 +41,13 @@ export async function initializeWebSocket() {
   return true;
 }
 
-export async function authorize(password, autosave_path, database_path) {
+export async function authorize(address, password, database_path) {
+  const addressData = address.split(':');
   return await sendAction('authorize',
     {
+      ip: addressData[0],
+      port: addressData[1],
       password: password,
-      autosave_path: autosave_path,
       database_path: database_path
     }
   );

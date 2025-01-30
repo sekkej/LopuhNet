@@ -1,14 +1,11 @@
-import json
-import base64
 import asyncio
 from PIL import Image
-from lnet import LNetAPI, DataAutoSaver, AccountData, events, types
+from lnet import LNetAPI, events, types
 
-autosaver = DataAutoSaver("Your Password Here!...", autosave_path='client_async/account_data.json')
 client = LNetAPI(
     '127.0.0.1', 9229,
+    'YourDBPasswordHere!'
     'client_async/lnet.db',
-    autosaver=autosaver,
 )
 
 @client.event

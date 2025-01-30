@@ -73,6 +73,7 @@ class Database:
         self.cur.execute(sql, tuple(data.values()))
         self.con.commit()
 
+        self.logger.info("Successfully updated user in Database!")
         return True
 
     def fetch_user(self, userid: str = None, username: str = None):
@@ -113,7 +114,7 @@ class Database:
         self.cur.execute(f"INSERT INTO users VALUES ({time}, '{user.name}', '{user.username}', {user.avatar_seed}, '{user.public_key}', '{user.public_signkey}', '{user.private_key}', '{user.private_signkey}', '{user.userid}')")
         self.con.commit()
 
-        self.logger.info("Registration gone successfully!")
+        self.logger.info("Successfully registered user into Database!")
         return True
     
     def remove_user(self, userid: str):
@@ -123,6 +124,7 @@ class Database:
         self.cur.execute(f"DELETE FROM users WHERE uid = '{userid}';")
         self.con.commit()
 
+        self.logger.info("Successfully removed user from Database!")
         return True
 
     def add_event(self, t: int, recipient_id: str, event: Event, eid: str = None):
@@ -136,28 +138,28 @@ class Database:
         self.cur.execute(f"INSERT INTO events VALUES ({t}, '{recipient_id}', ?, '{eid}')", (event._json,))
         self.con.commit()
 
-        self.logger.debug('Added new event.')
+        self.logger.debug('Added new event to Database.')
         return True
     
-    def add_events(self, event_list: list[tuple[int, bytes, str|None]]):
-        added_events = 0
+    # def add_events(self, event_list: list[tuple[int, bytes, str|None]]):
+    #     added_events = 0
 
-        for t, secure_packet, eid in event_list:
-            b64packet = base64.b64encode(secure_packet).decode()
+    #     for t, secure_packet, eid in event_list:
+    #         b64packet = base64.b64encode(secure_packet).decode()
 
-            if eid is None:
-                eid = xxhash.xxh128(f'{time.time_ns()}').hexdigest()
-            else:
-                packet_exists = self.cur.execute(f"SELECT * FROM events WHERE eid='{eid}';").fetchone()
-                if packet_exists is not None:
-                    continue # Event with that id have already been registered in Database.
+    #         if eid is None:
+    #             eid = xxhash.xxh128(f'{time.time_ns()}').hexdigest()
+    #         else:
+    #             packet_exists = self.cur.execute(f"SELECT * FROM events WHERE eid='{eid}';").fetchone()
+    #             if packet_exists is not None:
+    #                 continue # Event with that id have already been registered in Database.
 
-            added_events += 1
-            self.cur.execute(f"INSERT INTO events VALUES ({t}, '{b64packet}', '{eid}')")
+    #         added_events += 1
+    #         self.cur.execute(f"INSERT INTO events VALUES ({t}, '{b64packet}', '{eid}')")
         
-        self.con.commit()
-        self.logger.debug(f'Added {added_events}/{len(event_list)} events.')
-        return True
+    #     self.con.commit()
+    #     self.logger.debug(f'Added {added_events}/{len(event_list)} events.')
+    #     return True
     
     def get_50_events(self, recipients_ids: str, first_known_index: int = 0):
         """
@@ -186,7 +188,7 @@ class Database:
         self.cur.execute(f"DELETE FROM events WHERE rowid = {index+1};")
         self.con.commit()
 
-        self.logger.debug(f'Removed event at index: {index}.')
+        self.logger.debug(f'Removed event from Database at index: {index}.')
         return True
     
     def get_client_account(self) -> User|None:
