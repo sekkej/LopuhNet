@@ -1,8 +1,8 @@
-img {
+.sidebar-option {
     filter: invert(98%) sepia(0%) saturate(7474%) hue-rotate(240deg) brightness(124%) contrast(99%);
 }
 
-img:hover {
+.sidebar-option:hover {
     filter: invert(90%) sepia(4%) saturate(2274%) hue-rotate(56deg) brightness(91%) contrast(78%);
     cursor: pointer;
 }

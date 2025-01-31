@@ -62,6 +62,7 @@ export const Sidebar = ({ username, chats, onUserClick }: SidebarProps) => {
           <div className="profile-extra">
             {authorized ?
               <img
+                className='sidebar-option'
                 src="/friends.svg"
                 style={{ width: '16px', height: '16px', marginRight: '8px' }}
                 onClick={() => handleSelection("friendsTab")}

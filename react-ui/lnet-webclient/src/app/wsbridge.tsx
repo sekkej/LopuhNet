@@ -53,6 +53,19 @@ export async function authorize(address, password, database_path) {
   );
 }
 
+export async function register(address, username, password, database_path) {
+  const addressData = address.split(':');
+  return await sendAction('register',
+    {
+      ip: addressData[0],
+      port: addressData[1],
+      username: username,
+      password: password,
+      database_path: database_path
+    }
+  );
+}
+
 ws.onopen = () => {
   isWSActive = true;
 }

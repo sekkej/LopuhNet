@@ -5,8 +5,10 @@ import { WorkspaceComponent } from './components/WorkspaceComponent/WorkspaceCom
 import { Sidebar } from './components/Sidebar/Sidebar';
 import { AuthComponent } from './components/AuthComponent/AuthComponent';
 import { initializeWebSocket, sendAction } from './wsbridge';
+import { RegisterComponent } from './components/RegisterComponent/RegisterComponent';
 
 export default function Main() {
+  const [loginMethod, setLoginMethod] = useState<string>('auth');
   const [chats, setChats] = useState([]);
   const [currentSelfUser, setCurrentSelfUser] = useState<object | null>(null);
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
@@ -55,11 +57,29 @@ export default function Main() {
     setSelectedChatId(userId);
   };
 
+  const loginComponent = (
+    <>
+      {loginMethod == "auth"
+       &&
+      <AuthComponent
+        onSuccess={() => setIsAuthorized(true)}
+        onDifferentMethod={() => setLoginMethod('reg')} 
+      />}
+
+      {loginMethod == "reg"
+       &&
+      <RegisterComponent
+        onSuccess={() => setIsAuthorized(true)}
+        onDifferentMethod={() => setLoginMethod('auth')} 
+      />}
+    </>
+  );
+
   return (
     <>
       <Sidebar username={currentSelfUser?.username} chats={chats} onUserClick={handleUserClick} />
       <main className={isAuthorized ? "main-content" : "main-content main-centered"}>
-        {!isAuthorized && <AuthComponent onSuccess={() => setIsAuthorized(true)} />}
+        {!isAuthorized && loginComponent}
         {isAuthorized && <WorkspaceComponent chatId={selectedChatId} selfUser={currentSelfUser} />}
       </main>
     </>

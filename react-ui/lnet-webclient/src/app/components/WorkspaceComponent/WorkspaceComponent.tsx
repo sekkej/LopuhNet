@@ -1,6 +1,7 @@
 "use client"
 
 import './workspacecomponent.css';
+import { useState } from 'react';
 import { MainMenu } from './MainMenu/MainMenu';
 import { FriendsMenu } from './FriendsMenu/FriendsMenu';
 import { ChatComponent } from './ChatComponent/ChatComponent';
@@ -11,13 +12,15 @@ interface WorkspaceComponentProps {
 }
 
 export const WorkspaceComponent = ({ chatId, selfUser }: WorkspaceComponentProps) => {
+  const [chatMessages, setChatMessages] = useState([]);
+
   if (chatId == null) {
-    return (<MainMenu></MainMenu>);
+    return (<MainMenu/>);
   }
 
   if (chatId === "friendsTab") {
-    return (<FriendsMenu></FriendsMenu>);
+    return (<FriendsMenu/>);
   }
 
-  return (<ChatComponent chatId={chatId} selfUser={selfUser}></ChatComponent>);
+  return (<ChatComponent messages={chatMessages} setMessages={setChatMessages} chatId={chatId} selfUser={selfUser}/>);
 };

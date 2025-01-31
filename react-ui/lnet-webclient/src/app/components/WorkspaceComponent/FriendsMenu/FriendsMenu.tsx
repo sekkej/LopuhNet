@@ -1,5 +1,6 @@
 "use client"
 
+import './friendsmenu.css';
 import { useEffect, useState } from "react";
 import { sendAction } from '../../../wsbridge';
 

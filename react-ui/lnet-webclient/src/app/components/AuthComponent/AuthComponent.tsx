@@ -3,21 +3,21 @@
 import React, { useState } from 'react';
 import { authorize } from '../../wsbridge';
 import './authcomponent.css';
+import { OrbitProgress } from 'react-loading-indicators';
 
 interface AuthComponentProps {
   onSuccess: () => void;
+  onDifferentMethod: () => void;
 }
 
-export const AuthComponent = ({ onSuccess }: AuthComponentProps) => {
+export const AuthComponent = ({ onSuccess, onDifferentMethod }: AuthComponentProps) => {
   const [address, setAddress] = useState('');
   const [password, setPassword] = useState('');
+  const [isLoading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleAuthorize = async () => {
-    // ! Remove after debugging
-    setAddress("127.0.0.1:9229");
-    setPassword("unit1secretPassword");
-
+  const handleAuthorizeButton = async () => {
+    setLoading(true);
     try {
       const dbName = `${address.replace(':','#')}.db`;
       const authResult = await authorize(address, password, dbName);
@@ -30,6 +30,7 @@ export const AuthComponent = ({ onSuccess }: AuthComponentProps) => {
     } catch (err) {
       setError('Authorization failed. Please try again.');
     }
+    setLoading(false);
   };
 
   return (
@@ -38,7 +39,7 @@ export const AuthComponent = ({ onSuccess }: AuthComponentProps) => {
       <h3 className="unselectable">Authorization</h3>
       <input
         type="text"
-        placeholder="Server address (i.e. IP:Port)"
+        placeholder="Server address (i.e. host:port)"
         value={address}
         onChange={(e) => setAddress(e.target.value)}
       />
@@ -48,7 +49,9 @@ export const AuthComponent = ({ onSuccess }: AuthComponentProps) => {
         value={password}
         onChange={(e) => setPassword(e.target.value)}
       />
-      <button className="unselectable" onClick={handleAuthorize}>Authorize</button>
+      {isLoading && <OrbitProgress color="var(--accent)" size="small" />}
+      {!isLoading && <button className="unselectable" onClick={handleAuthorizeButton}>Authorize</button>}
+      <p className="unselectable" onClick={onDifferentMethod}>Don't have an account?</p>
       {error && <div className="error-message">{error}</div>}
     </div>
   );
