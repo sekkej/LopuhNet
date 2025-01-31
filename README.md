@@ -10,7 +10,7 @@ LNet uses [**SQLite**](https://www.sqlite.org/), but as the database management 
 The database is **decentralized** by default, that means, <ins>*if server is not modified*</ins>[^2][^3] then server **will <ins>not</ins> save your messages**. Additionally, it is **decentralized** by the meaning of official servers, as it has not any of them, you'll need to setup your own or use existing one from someone.
 
 [^1]: Communication in LNet happens by events *(e.g.: MsgCreated, MsgDeleted, etc.)*, which allows you to not just simply share with messages, but do *a lot more* than that.
-[^2]: *As you need to setup your own server to communicate or use existing one*, the server side of code **may be modified**, which means it can save transmitted data. **However, all transmitted data is encrypted**, so server have no clue what it transmits.
+[^2]: *As you need to setup your own server to communicate or use existing one*, the server side of code **may be modified**, which means it can save transmitted data. **However, all transmitted data is encrypted**, so server has no clue what it transmits.
 [^3]: Not only server can be modified, but the client side too. While **LNet does not support any server's intervention into the client's side**, you're allowed to **notify** *your users* to download your own version of the client.
 
 > [!IMPORTANT]
